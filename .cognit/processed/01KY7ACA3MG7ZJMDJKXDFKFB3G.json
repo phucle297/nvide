@@ -1,0 +1,96 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7ACA3MG7ZJMDJKXDFKFB3G",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "grep",
+    "tool_input": {
+      "pattern": "ai\\.|AI",
+      "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html"
+    },
+    "tool_response": {
+      "type": "GrepSearch",
+      "stdout": [
+        60,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        114,
+        101,
+        115,
+        117,
+        108,
+        116,
+        32,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        112,
+        97,
+        116,
+        104,
+        61,
+        34,
+        47,
+        104,
+        111,
+        109,
+        101,
+        47,
+        "…"
+      ],
+      "stderr": [],
+      "exit_code": 0,
+      "match_count": 4,
+      "file_matches": [
+        {
+          "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+          "matches": [
+            {
+              "line_number": 1792,
+              "content": "│                     REMOTE / WSL / CONTAINER AGENT                       │"
+            },
+            {
+              "line_number": 3469,
+              "content": "  const DETAILS_KEY = \"nvide-arch-details\";"
+            },
+            {
+              "line_number": 3703,
+              "content": "    try { localStorage.setItem(DETAILS_KEY, JSON.stringify(state)); } catch (e) {}"
+            },
+            {
+              "line_number": 3707,
+              "content": "      const raw = localStorage.getItem(DETAILS_KEY);"
+            }
+          ]
+        }
+      ]
+    },
+    "text": "tool grep → /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}

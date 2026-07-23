@@ -1,0 +1,24 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7GDX3Z9815S3HTWV44F910",
+  "source": {
+    "tool": "grok",
+    "command": "PreToolUse"
+  },
+  "payload": {
+    "phase": "pre",
+    "host": "grok",
+    "tool": "run_terminal_command",
+    "tool_input": {
+      "command": "cd /home/permees/Projects/github.com/phucle297/nvide && python3 << 'PY'\nfrom pathlib import Path\nimport re\n\npath = Path(\"docs/assets/document.js\")\njs = path.read_text(encoding=\"utf-8\")\n\n# Fix the over-indented active section block: lines that have 8+ extra spaces inside IIFE\n# Find from \"Active section highlight\" to \"initHighlight\" end\nstart = js.find(\"/* ---------- Active section highlight\")\nend = js.find(\"/* ---------- Back to top ---------- */\")\nif start < 0 or end < 0:\n    raise SystemExit(f\"markers {start} {end}\")\n\nblock = js[start:end]\n# Remove common extra indent of 8 spaces from each line of the block\nfixed_lines = []\nfor ln in block.splitlines():\n    if ln.startswith(\"        \") and not ln.startswith(\"  /*\"):\n        # active block was inserted with 8 spaces base from IIFE's 2 spa…",
+      "description": "Normalize document.js active-section indentation"
+    },
+    "text": "agent intends to run_terminal_command: cd /home/permees/Projects/github.com/phucle297/nvide && python3 << 'PY'\nfrom pathlib import Path\nimport re\n\npath = Path(\"docs/assets/document.js\")\njs = path.read_text(encoding=\"utf-8\")\n\n# Fix the over",
+    "path": null,
+    "command": "cd /home/permees/Projects/github.com/phucle297/nvide && python3 << 'PY'\nfrom pathlib import Path\nimport re\n\npath = Path(\"docs/assets/document.js\")\njs = path.read_text(encoding=\"utf-8\")\n\n# Fix the over-indented active section block: lines that have 8+ extra spaces inside IIFE\n# Find from \"Active section highlight\" to \"initHighlight\" end\nstart = js.find(\"/* ---------- Active section highlight\")\nend = js.find(\"/* ---------- Back to top ---------- */\")\nif start < 0 or end < 0:\n    raise SystemExit(f\"markers {start} {end}\")\n\nblock = js[start:end]\n# Remove common extra indent of 8 spaces from each line of the block\nfixed_lines = []\nfor ln in block.splitlines():\n    if ln.startswith(\"        \") and not ln.startswith(\"  /*\"):\n        # active block was inserted with 8 spaces base from IIFE's 2 spaces... messy\n        # Dedent by 6 spaces if line has heavy indent\n        if ln.startswith(\"        \"):\n            # count leading spaces\n            sp = len(ln) - len(ln.lstrip(\" \"))\n            if sp >= 8:\n                ln = ln[6:]  # pull back toward 2-space IIFE body\n    fixed_lines.append(ln)\nfixed = \"\\n\".join(fixed_lines)\nif not fixed.endswith(\"\\n\"):\n    fixed += \"\\n\"\n\njs2 = js[:start] + fixed + js[end:]\npath.write_text(js2, encoding=\"utf-8\")\n\nimport subprocess\nr = subprocess.run([\"node\", \"--check\", str(path)], capture_output=True, text=True)\nprint(r.returncode, r.stderr or \"JS_OK\")\n\n# show snippet\ntext = path.read_text()\ni = text.find(\"Active section highlight\")\nprint(text[i:i+600])\nPY"
+  }
+}

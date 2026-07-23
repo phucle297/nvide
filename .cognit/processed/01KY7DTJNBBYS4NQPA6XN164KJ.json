@@ -1,0 +1,241 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7DTJNBBYS4NQPA6XN164KJ",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "grep",
+    "tool_input": {
+      "pattern": "Success Metrics|Idle RSS|Cold start|Tier A|No Vimscript|legacy unrestricted|plugin-sandbox|failure-recovery|LSP|50–200|mtime|hybrid|P1 —",
+      "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html"
+    },
+    "tool_response": {
+      "type": "GrepSearch",
+      "stdout": [
+        60,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        114,
+        101,
+        115,
+        117,
+        108,
+        116,
+        32,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        112,
+        97,
+        116,
+        104,
+        61,
+        34,
+        47,
+        104,
+        111,
+        109,
+        101,
+        47,
+        "…"
+      ],
+      "stderr": [],
+      "exit_code": 0,
+      "match_count": 63,
+      "file_matches": [
+        {
+          "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+          "matches": [
+            {
+              "line_number": 951,
+              "content": "            <td><a href=\"#plugins\">Plugin System</a>, <a href=\"#plugin-sandbox\">Sandbox</a></td>"
+            },
+            {
+              "line_number": 985,
+              "content": "            <td>VS Code–like; agent owns remote FS/PTY/LSP/Git tools</td>"
+            },
+            {
+              "line_number": 1042,
+              "content": "            <td><a href=\"#failure-recovery\">Failure Recovery</a>, <a href=\"#appendix-process-supervisor\">Appendix</a></td>"
+            },
+            {
+              "line_number": 1099,
+              "content": "            <td>Daily-driver for team; Lua config; LSP; terminal; git; basic SSH; installers</td>"
+            },
+            {
+              "line_number": 1473,
+              "content": "    <h3 id=\"flow-lsp\">LSP Diagnostic Path</h3>"
+            },
+            {
+              "line_number": 1485,
+              "content": "      <figcaption>Figure F3 — LSP diagnostics</figcaption>"
+            },
+            {
+              "line_number": 1505,
+              "content": "     │  LSP_* on remote                 │"
+            },
+            {
+              "line_number": 1507,
+              "content": "      <figcaption>Figure F4 — Remote FS + LSP</figcaption>"
+            },
+            {
+              "line_number": 1539,
+              "content": "            <td>Monotonic <code>version</code> for LSP</td>"
+            },
+            {
+              "line_number": 1595,
+              "content": "      <li><strong>Snapshots:</strong> for async consumers (LSP, search), take versioned immutable snapshots; drop if <code>version</code> mismatched on apply.</li>"
+            },
+            {
+              "line_number": 1620,
+              "content": "            <td>File not found; LSP crash; SSH drop</td>"
+            },
+            {
+              "line_number": 1696,
+              "content": "    <h3 id=\"success-metrics\">Success Metrics</h3>"
+            },
+            {
+              "line_number": 1703,
+              "content": "          <tr><td>Cold start to editable buffer</td><td class=\"mid\">&lt; 400 ms</td><td class=\"good\">&lt; 200 ms</td><td class=\"good\">&lt; 100 ms</td></tr>"
+            },
+            {
+              "line_number": 1704,
+              "content": "          <tr><td>Idle RSS (empty workspace)</td><td class=\"mid\">&lt; 120 MB</td><td class=\"good\">&lt; 80 MB</td><td class=\"good\">&lt; 60 MB</td></tr>"
+            },
+            {
+              "line_number": 1707,
+              "content": "          <tr><td>Neovim plugin compatibility (Tier A)</td><td class=\"mid\">~40%</td><td class=\"mid\">~70%</td><td class=\"good\">~85%+</td></tr>"
+            },
+            {
+              "line_number": 1725,
+              "content": "      <div class=\"card\"><h4>P1 — Process Isolation First</h4><p>UI, core, plugins, language servers, and remote hosts never share an address space unless explicitly opted in. A plugin crash must never take down the editor.</p></div>"
+            },
+            {
+              "line_number": 1740,
+              "content": "          <tr><td>Polyglot professional</td><td>LSP, debug, git, multi-root</td><td>Language host process, DAP, multi-workspace</td></tr>"
+            },
+            {
+              "line_number": 1771,
+              "content": "│         │                    │ Lua / Rust  │    │  LSP / DAP  │          │"
+            },
+            {
+              "line_number": 1786,
+              "content": "│  nvide-agent: FS · PTY · LSP · Git · file watchers                      │"
+            },
+            {
+              "line_number": 1803,
+              "content": "          <tr><td>Lang host</td><td><code>nvide-lang</code></td><td>LSP/DAP client lifecycle</td><td>IntelliSense gap</td><td>Auto restart servers</td></tr>"
+            },
+            {
+              "line_number": 1806,
+              "content": "          <tr><td>Remote agent</td><td><code>nvide-agent</code></td><td>Remote FS/LSP/PTY/Git tools</td><td>Remote workspace offline</td><td>Reconnect + resume</td></tr>"
+            },
+            {
+              "line_number": 1825,
+              "content": "      <li><strong>LSP path:</strong> Buffer change → debounced didChange → lang host → server → diagnostics/completion → core → UI overlays.</li>"
+            },
+            {
+              "line_number": 1826,
+              "content": "      <li><strong>Remote path:</strong> Same logical RPCs; transport is multiplexed over SSH/WSL/Docker; agent executes FS/PTY/LSP locally on remote.</li>"
+            },
+            {
+              "line_number": 1863,
+              "content": "          <tr><td>LSP</td><td>Completion, Diagnostics</td><td>50–200 ms</td><td>Per-request cancelable</td></tr>"
+            },
+            {
+              "line_number": 1877,
+              "content": "    <h3 id=\"failure-recovery\">Failure Recovery</h3>"
+            },
+            {
+              "line_number": 1918,
+              "content": "│   ├── nvide-lsp/             # LSP client"
+            },
+            {
+              "line_number": 2105,
+              "content": "│          │ Status: mode · branch · LSP · cursor · encoding         │"
+            },
+            {
+              "line_number": 2129,
+              "content": "          <tr><td>Breadcrumb</td><td>Symbol path from LSP/treesitter</td><td>Click to navigate</td></tr>"
+            },
+            {
+              "line_number": 2139,
+              "content": "      <li><strong>Animation:</strong> 150–200 ms ease for panels; respect <code>prefers-reduced-motion</code>.</li>"
+            },
+            {
+              "line_number": 2230,
+              "content": "    version: u64,           // monotonic for LSP"
+            },
+            {
+              "line_number": 2313,
+              "content": "      <li>Semantic tokens from LSP overlay and win on conflict when enabled.</li>"
+            },
+            {
+              "line_number": 2324,
+              "content": "      <li>Folds: tree of fold ranges; provider from treesitter, LSP, indent, manual.</li>"
+            },
+            {
+              "line_number": 2340,
+              "content": "      <li><strong>Jump list:</strong> per-window history of positions; tagged jumps from LSP/goto.</li>"
+            },
+            {
+              "line_number": 2354,
+              "content": "      <li><strong>Swap/recovery files:</strong> per-file recovery blobs with mtime/hash checks.</li>"
+            },
+            {
+              "line_number": 2469,
+              "content": "          <tr><td>WASM (future)</td><td>Wasmtime</td><td>Portable sandboxed plugins</td><td>Strong</td><td>Yes</td></tr>"
+            },
+            {
+              "line_number": 2490,
+              "content": "    <h3 id=\"plugin-sandbox\">Sandbox, Permissions, Isolation</h3>"
+            },
+            {
+              "line_number": 2493,
+              "content": "      <p>Default-deny sensitive capabilities. Plugins declare required permissions in manifest. User grants at install or first use (similar to mobile + VS Code workspace trust hybrid).</p>"
+            },
+            {
+              "line_number": 2538,
+              "content": "      <p><strong>MVP estimate:</strong> ~35–45% of popular pure-Lua plugins with Tier A APIs implemented; rising as tiers expand.</p>"
+            },
+            {
+              "line_number": 2646,
+              "content": "events → other plugins / LSP / UI</code></pre>"
+            },
+            {
+              "line_number": 2669,
+              "content": "  <h2 id=\"language-features\">Language Features (LSP, DAP, Tools)</h2>"
+            },
+            "…"
+          ]
+        }
+      ]
+    },
+    "text": "tool grep → /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7BAKF5J6YXRM06W5ZBVFX8",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "grep",
+    "tool_input": {
+      "pattern": "ADR-00(1[0-9]|20)|adr-00(1[0-9]|20)",
+      "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html"
+    },
+    "tool_response": {
+      "type": "GrepSearch",
+      "stdout": [
+        60,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        114,
+        101,
+        115,
+        117,
+        108,
+        116,
+        32,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        112,
+        97,
+        116,
+        104,
+        61,
+        34,
+        47,
+        104,
+        111,
+        109,
+        101,
+        47,
+        "…"
+      ],
+      "stderr": [],
+      "exit_code": 0,
+      "match_count": 26,
+      "file_matches": [
+        {
+          "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+          "matches": [
+            {
+              "line_number": 862,
+              "content": "    <div><dt>ADR Catalog Version</dt><dd>2026.07 (ADR-0001 … ADR-0020)</dd></div>"
+            },
+            {
+              "line_number": 989,
+              "content": "            <td id=\"adr-0010\"><strong>ADR-0010</strong></td>"
+            },
+            {
+              "line_number": 996,
+              "content": "            <td id=\"adr-0011\"><strong>ADR-0011</strong></td>"
+            },
+            {
+              "line_number": 1003,
+              "content": "            <td id=\"adr-0012\"><strong>ADR-0012</strong></td>"
+            },
+            {
+              "line_number": 1010,
+              "content": "            <td id=\"adr-0013\"><strong>ADR-0013</strong></td>"
+            },
+            {
+              "line_number": 1017,
+              "content": "            <td id=\"adr-0014\"><strong>ADR-0014</strong></td>"
+            },
+            {
+              "line_number": 1024,
+              "content": "            <td id=\"adr-0015\"><strong>ADR-0015</strong></td>"
+            },
+            {
+              "line_number": 1031,
+              "content": "            <td id=\"adr-0016\"><strong>ADR-0016</strong></td>"
+            },
+            {
+              "line_number": 1038,
+              "content": "            <td id=\"adr-0017\"><strong>ADR-0017</strong></td>"
+            },
+            {
+              "line_number": 1045,
+              "content": "            <td id=\"adr-0018\"><strong>ADR-0018</strong></td>"
+            },
+            {
+              "line_number": 1052,
+              "content": "            <td id=\"adr-0019\"><strong>ADR-0019</strong></td>"
+            },
+            {
+              "line_number": 1059,
+              "content": "            <td id=\"adr-0020\"><strong>ADR-0020</strong></td>"
+            },
+            {
+              "line_number": 1080,
+              "content": "  <p>Engineering phases (Phase 0…6 in <a href=\"#roadmap\">Implementation Roadmap</a>) are execution slices. <strong>Product milestones</strong> below are what contributors and users orient on. See <a href=\"#adr-0020\">ADR-0020</a>.</p>"
+            },
+            {
+              "line_number": 1181,
+              "content": "            <td><a href=\"#adr-0020\">ADR-0020</a></td>"
+            },
+            {
+              "line_number": 1197,
+              "content": "            <td><a href=\"#adr-0004\">ADR-0004</a>, <a href=\"#adr-0017\">ADR-0017</a></td>"
+            },
+            {
+              "line_number": 1213,
+              "content": "            <td><a href=\"#adr-0002\">ADR-0002</a>, <a href=\"#adr-0018\">ADR-0018</a></td>"
+            },
+            {
+              "line_number": 1221,
+              "content": "            <td><a href=\"#adr-0020\">ADR-0020</a></td>"
+            },
+            {
+              "line_number": 1229,
+              "content": "            <td><a href=\"#adr-0011\">ADR-0011</a></td>"
+            },
+            {
+              "line_number": 1242,
+              "content": "  <p>Large monorepos fail when “everything depends on everything.” NVide uses four visibility tiers. Enforced by crate features, <code>pub(crate)</code> discipline, and CI dependency allowlists. See <a href=\"#adr-0012\">ADR-0012</a>.</p>"
+            },
+            {
+              "line_number": 1317,
+              "content": "  <p>Multiple version clocks exist on purpose. Do not conflate product release with plugin ABI. See <a href=\"#adr-0016\">ADR-0016</a>, <a href=\"#adr-0011\">ADR-0011</a>.</p>"
+            },
+            {
+              "line_number": 1524,
+              "content": "  <p>Rust correctness at IDE scale depends on explicit ownership. Default: <strong>one owner, many borrowed readers, Arc only at process/service boundaries</strong>. See <a href=\"#adr-0013\">ADR-0013</a>.</p>"
+            },
+            {
+              "line_number": 1612,
+              "content": "  <p>Unify failure handling early so contributors do not invent per-crate conventions. See <a href=\"#adr-0014\">ADR-0014</a>.</p>"
+            },
+            {
+              "line_number": 1948,
+              "content": "    <p>See also <a href=\"#crate-ownership\">Crate Ownership</a>, <a href=\"#dependency-diagram\">Dependency Diagram</a>, and <a href=\"#adr-0012\">ADR-0012</a>.</p>"
+            },
+            {
+              "line_number": 2130,
+              "content": "          <tr><td>Terminal panel</td><td>Multiplexed terminals</td><td><a href=\"#terminal\">Terminal</a> · <a href=\"#adr-0015\">ADR-0015</a></td></tr>"
+            },
+            {
+              "line_number": 3025,
+              "content": "  <p>Testing is a product requirement, not an afterthought. Gates are defined in <a href=\"#adr-0019\">ADR-0019</a>. No merge to <code>main</code> with red required checks.</p>"
+            },
+            {
+              "line_number": 3348,
+              "content": "    <p>The canonical ADR catalog is at the <strong>front</strong> of this document: <a href=\"#adr-catalog\">Architecture Decision Record Catalog</a> (<a href=\"#adr-0001\">ADR-0001</a> … <a href=\"#adr-0020\">ADR-0020</a>+). This section exists so older links to <code>#adr-index</code> still resolve.</p>"
+            }
+          ]
+        }
+      ]
+    },
+    "text": "tool grep → /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}

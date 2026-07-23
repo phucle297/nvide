@@ -1,0 +1,59 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7ACA8Q4SK3A28QF6BXZNWK",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "run_terminal_command",
+    "tool_input": {
+      "command": "# confirm settings json and any leftover\nrg -n \"ai\\.|AI |AI-|openai|nvide-ai|ai-host|10\\+|10-year|decade|Decade|Horizon\" /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html || echo CLEAN\n# shell diagram fine\npython3 -c \"\nfrom pathlib import Path\nimport re\nh=Path('docs/architecture.html').read_text()\nassert 'id=\\\"ai\\\"' not in h and 'AI Subsystem' not in h\nassert '10+ years' not in h and '10-year' not in h and 'decade-scale' not in h\nassert 'Decade Target' not in h\nprint('assertions OK')\n\"",
+      "description": "Final assertions on AI and decade removal"
+    },
+    "tool_response": {
+      "type": "Bash",
+      "output": [
+        67,
+        76,
+        69,
+        65,
+        78,
+        10,
+        97,
+        115,
+        115,
+        101,
+        114,
+        116,
+        105,
+        111,
+        110,
+        115,
+        32,
+        79,
+        75,
+        10
+      ],
+      "output_for_prompt": "exit: 0\nCLEAN\nassertions OK\n",
+      "exit_code": 0,
+      "command": "# confirm settings json and any leftover\nrg -n \"ai\\.|AI |AI-|openai|nvide-ai|ai-host|10\\+|10-year|decade|Decade|Horizon\" /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html || echo CLEAN\n# shell diagram fine\npython3 -c \"\nfrom pathlib import Path\nimport re\nh=Path('docs/architecture.html').read_text()\nassert 'id=\\\"ai\\\"' not in h and 'AI Subsystem' not in h\nassert '10+ years' not in h and '10-year' not in h and 'decade-scale' not in h\nassert 'Decade Target' not in h\nprint('assertions OK')\n\"",
+      "truncated": false,
+      "signal": null,
+      "timed_out": false,
+      "description": "Final assertions on AI and decade removal",
+      "current_dir": "/home/permees/Projects/github.com/phucle297/nvide",
+      "output_file": "/home/permees/.grok/sessions/%2Fhome%2Fpermees%2FProjects%2Fgithub.com%2Fphucle297%2Fnvide/019f8e47-f17d-7943-86ee-3cfd76b3b916/terminal/call-55cec923-b55f-4eda-bc95-35ea86157622-34.log",
+      "total_bytes": 20
+    },
+    "text": "tool run_terminal_command: # confirm settings json and any leftover\nrg -n \"ai\\.|AI |AI-|openai|nvide-ai|ai-host|10\\+|10-year|decade|Decade|Horizon\" /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html || ech",
+    "path": null,
+    "command": "# confirm settings json and any leftover\nrg -n \"ai\\.|AI |AI-|openai|nvide-ai|ai-host|10\\+|10-year|decade|Decade|Horizon\" /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html || echo CLEAN\n# shell diagram fine\npython3 -c \"\nfrom pathlib import Path\nimport re\nh=Path('docs/architecture.html').read_text()\nassert 'id=\\\"ai\\\"' not in h and 'AI Subsystem' not in h\nassert '10+ years' not in h and '10-year' not in h and 'decade-scale' not in h\nassert 'Decade Target' not in h\nprint('assertions OK')\n\""
+  }
+}

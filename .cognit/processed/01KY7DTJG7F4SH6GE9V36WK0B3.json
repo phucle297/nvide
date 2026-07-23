@@ -1,0 +1,37 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7DTJG7F4SH6GE9V36WK0B3",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "read_file",
+    "tool_input": {
+      "target_file": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+      "offset": 2980,
+      "limit": 100
+    },
+    "tool_response": {
+      "type": "ReadFile",
+      "FileContent": {
+        "content": "2980→     18. BUILD SYSTEM\n     ============================================================ -->\n<section>\n  <h2 id=\"build\">Build System, CI/CD, Releases</h2>\n\n  <article>\n    <h3 id=\"build-pipeline\">Build &amp; Release Pipeline</h3>\n    <ul>\n      <li>Cargo workspace; <code>cargo xtask</code> for orchestration (package, schema gen, grammar build).</li>\n      <li>CI matrix: Windows x64, macOS x64, macOS arm64, Linux x64 (Ubuntu), optional Linux arm64.</li>\n2990→      <li>Checks: fmt, clippy -D warnings, tests, benches (non-failing thresholds), plugin compat suite.</li>\n      <li><strong>Nightly builds:</strong> every main commit → artifacts; 7-day retention.</li>\n      <li><strong>Stable builds:</strong> tagged semver; signed; changelog generated from conventional commits.</li>\n      <li><…",
+        "content_concise": "2980→     18. BUILD SYSTEM\n     ============================================================ -->\n<section>\n  <h2 id=\"build\">Build System, CI/CD, Releases</h2>\n\n  <article>\n    <h3 id=\"build-pipeline\">Build &amp; Release Pipeline</h3>\n    <ul>\n      <li>Cargo workspace; <code>cargo xtask</code> for orchestration (package, schema gen, grammar build).</li>\n      <li>CI matrix: Windows x64, macOS x64, macOS arm64, Linux x64 (Ubuntu), optional Linux arm64.</li>\n2990→      <li>Checks: fmt, clippy -D warnings, tests, benches (non-failing thresholds), plugin compat suite.</li>\n      <li><strong>Nightly builds:</strong> every main commit → artifacts; 7-day retention.</li>\n      <li><strong>Stable builds:</strong> tagged semver; signed; changelog generated from conventional commits.</li>\n      <li><…",
+        "absolute_path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+        "offset": 2980,
+        "limit": 100,
+        "raw_output": "     18. BUILD SYSTEM\n     ============================================================ -->\n<section>\n  <h2 id=\"build\">Build System, CI/CD, Releases</h2>\n\n  <article>\n    <h3 id=\"build-pipeline\">Build &amp; Release Pipeline</h3>\n    <ul>\n      <li>Cargo workspace; <code>cargo xtask</code> for orchestration (package, schema gen, grammar build).</li>\n      <li>CI matrix: Windows x64, macOS x64, macOS arm64, Linux x64 (Ubuntu), optional Linux arm64.</li>\n      <li>Checks: fmt, clippy -D warnings, tests, benches (non-failing thresholds), plugin compat suite.</li>\n      <li><strong>Nightly builds:</strong> every main commit → artifacts; 7-day retention.</li>\n      <li><strong>Stable builds:</strong> tagged semver; signed; changelog generated from conventional commits.</li>\n      <li><strong>Aut…",
+        "total_lines": 3832
+      }
+    },
+    "text": "tool read_file → /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}

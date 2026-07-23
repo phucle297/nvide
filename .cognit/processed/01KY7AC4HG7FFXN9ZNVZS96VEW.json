@@ -1,0 +1,48 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7AC4HG7FFXN9ZNVZS96VEW",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "search_replace",
+    "tool_input": {
+      "file_path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+      "old_string": "          <tr>\n            <td id=\"adr-0009\"><strong>ADR-0009</strong></td>\n            <td>Remote model (local UI/core + remote agent)</td>\n            <td>Accepted</td>\n            <td>VS Code–like; agent owns remote FS/PTY/LSP/Git tools</td>\n            <td><a href=\"#remote\">Remote Development</a></td>\n          </tr>\n          <tr>\n            <td id=\"adr-0011\"><strong>ADR-0011</strong></td>\n            <td>Stable Rust only (MSRV policy)</td>",
+      "new_string": "          <tr>\n            <td id=\"adr-0009\"><strong>ADR-0009</strong></td>\n            <td>Remote model (local UI/core + remote agent)</td>\n            <td>Accepted</td>\n            <td>VS Code–like; agent owns remote FS/PTY/LSP/Git tools</td>\n            <td><a href=\"#remote\">Remote Development</a></td>\n          </tr>\n          <tr>\n            <td id=\"adr-0010\"><strong>ADR-0010</strong></td>\n            <td>—</td>\n            <td>Withdrawn</td>\n            <td>Number reserved; content removed from architecture (not in scope)</td>\n            <td>—</td>\n          </tr>\n          <tr>\n            <td id=\"adr-0011\"><strong>ADR-0011</strong></td>\n            <td>Stable Rust only (MSRV policy)</td>"
+    },
+    "tool_response": {
+      "type": "SearchReplace",
+      "EditsApplied": {
+        "old_string": "          <tr>\n            <td id=\"adr-0009\"><strong>ADR-0009</strong></td>\n            <td>Remote model (local UI/core + remote agent)</td>\n            <td>Accepted</td>\n            <td>VS Code–like; agent owns remote FS/PTY/LSP/Git tools</td>\n            <td><a href=\"#remote\">Remote Development</a></td>\n          </tr>\n          <tr>\n            <td id=\"adr-0011\"><strong>ADR-0011</strong></td>\n            <td>Stable Rust only (MSRV policy)</td>",
+        "new_string": "          <tr>\n            <td id=\"adr-0009\"><strong>ADR-0009</strong></td>\n            <td>Remote model (local UI/core + remote agent)</td>\n            <td>Accepted</td>\n            <td>VS Code–like; agent owns remote FS/PTY/LSP/Git tools</td>\n            <td><a href=\"#remote\">Remote Development</a></td>\n          </tr>\n          <tr>\n            <td id=\"adr-0010\"><strong>ADR-0010</strong></td>\n            <td>—</td>\n            <td>Withdrawn</td>\n            <td>Number reserved; content removed from architecture (not in scope)</td>\n            <td>—</td>\n          </tr>\n          <tr>\n            <td id=\"adr-0011\"><strong>ADR-0011</strong></td>\n            <td>Stable Rust only (MSRV policy)</td>",
+        "tool_output_for_prompt": "The file /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html has been updated successfully.",
+        "tool_output_for_prompt_concise": "The file /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html has been updated.",
+        "absolute_path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+        "edits": {
+          "details": [
+            {
+              "old_string": "          <tr>\n            <td id=\"adr-0009\"><strong>ADR-0009</strong></td>\n            <td>Remote model (local UI/core + remote agent)</td>\n            <td>Accepted</td>\n            <td>VS Code–like; agent owns remote FS/PTY/LSP/Git tools</td>\n            <td><a href=\"#remote\">Remote Development</a></td>\n          </tr>\n          <tr>\n            <td id=\"adr-0011\"><strong>ADR-0011</strong></td>\n            <td>Stable Rust only (MSRV policy)</td>",
+              "old_line": 981,
+              "new_string": "          <tr>\n            <td id=\"adr-0009\"><strong>ADR-0009</strong></td>\n            <td>Remote model (local UI/core + remote agent)</td>\n            <td>Accepted</td>\n            <td>VS Code–like; agent owns remote FS/PTY/LSP/Git tools</td>\n            <td><a href=\"#remote\">Remote Development</a></td>\n          </tr>\n          <tr>\n            <td id=\"adr-0010\"><strong>ADR-0010</strong></td>\n            <td>—</td>\n            <td>Withdrawn</td>\n            <td>Number reserved; content removed from architecture (not in scope)</td>\n            <td>—</td>\n          </tr>\n          <tr>\n            <td id=\"adr-0011\"><strong>ADR-0011</strong></td>\n            <td>Stable Rust only (MSRV policy)</td>",
+              "new_line": 981,
+              "context_before": "            <td>Reads via gitoxide; complex writes via git CLI/hooks</td>\n            <td><a href=\"#git\">Git</a></td>\n          </tr>\n",
+              "context_after": "            <td>Accepted</td>\n            <td>No overnight nightly; MSRV documented; upgrade cadence</td>\n            <td><a href=\"#versioning-policy\">Versioning</a></td>\n",
+              "line_prefix": ""
+            }
+          ]
+        }
+      }
+    },
+    "text": "tool search_replace → /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}

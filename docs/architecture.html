@@ -1,0 +1,4759 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="NVide — Native Rust IDE Architecture Document."
+    />
+    <meta name="author" content="Chief Software Architect, NVide Project" />
+    <title>NVide Architecture Document — Native Rust IDE</title>
+    <link rel="stylesheet" href="assets/document.css" />
+  </head>
+  <body>
+    <header class="doc-header">
+      <button
+        type="button"
+        id="sidebar-toggle"
+        class="icon-btn"
+        aria-label="Toggle table of contents"
+      >
+        ☰
+      </button>
+      <a class="brand" href="#top">
+        <span class="brand-mark">N</span>
+        <span>NVide Architecture</span>
+      </a>
+      <span class="meta">v1.0 · Technical Design Document</span>
+      <div class="spacer"></div>
+      <div class="toolbar">
+        <input
+          type="search"
+          id="search-input"
+          placeholder="Search document…"
+          aria-label="Search within document"
+          autocomplete="off"
+        />
+        <span id="search-count" aria-live="polite"></span>
+        <button type="button" id="btn-expand" title="Expand all sections">
+          Expand
+        </button>
+        <button type="button" id="btn-collapse" title="Collapse all sections">
+          Collapse
+        </button>
+        <button
+          type="button"
+          id="theme-toggle"
+          title="Toggle theme"
+          aria-label="Toggle light/dark theme"
+        >
+          Theme
+        </button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar" aria-label="Table of contents">
+        <h2>Contents</h2>
+        <nav id="toc-nav"><ul id="toc"></ul></nav>
+      </aside>
+
+      <div class="content-wrap">
+        <main id="top">
+
+          <div class="cover">
+            <h1>NVide Architecture Document</h1>
+            <p class="subtitle">
+              Architecture for a native, GPU-accelerated IDE written entirely in
+              Rust — with first-class Lua configuration and a Neovim-compatible
+              plugin surface.
+            </p>
+            <dl class="cover-grid">
+              <div>
+                <dt>Document Status</dt>
+                <dd>Architecture Baseline</dd>
+              </div>
+              <div>
+                <dt>Architecture Version</dt>
+                <dd>0.2.0</dd>
+              </div>
+              <div>
+                <dt>ADR Catalog Version</dt>
+                <dd>2026.07 (ADR-0001 … ADR-0019)</dd>
+              </div>
+              <div>
+                <dt>Current Milestone</dt>
+                <dd>Pre-MVP · Phase 0 foundations</dd>
+              </div>
+              <div>
+                <dt>Language</dt>
+                <dd>Rust (stable only)</dd>
+              </div>
+              <div>
+                <dt>Target Rust / MSRV</dt>
+                <dd>1.85+ stable · MSRV 1.82</dd>
+              </div>
+              <div>
+                <dt>UI Stack</dt>
+                <dd>
+                  winit + wgpu + custom UI (<a href="#adr-0003">ADR-0003</a>)
+                </dd>
+              </div>
+              <div>
+                <dt>Config</dt>
+                <dd>Lua 5.4 first-class · no Vimscript</dd>
+              </div>
+              <div>
+                <dt>License</dt>
+                <dd>TBD (Apache-2.0 OR MIT recommended)</dd>
+              </div>
+              <div>
+                <dt>Classification</dt>
+                <dd>Engineering Design — Internal / Public</dd>
+              </div>
+              <div>
+                <dt>Last Updated</dt>
+                <dd>2026-07-23</dd>
+              </div>
+            </dl>
+            <div class="badge-row">
+              <span class="badge">Native Desktop</span>
+              <span class="badge">Multi-Process</span>
+              <span class="badge alt">GPU Rendering</span>
+              <span class="badge">Lua-First</span>
+              <span class="badge warn">Neovim Compat Layer</span>
+              <span class="badge">Cross-Platform</span>
+              <span class="badge alt">Remote Dev</span>
+            </div>
+          </div>
+
+          <div class="callout important">
+            <div class="callout-title">Important — Scope of this document</div>
+            <p>
+              This document is the
+              <strong>authoritative architecture baseline</strong> for NVide. It
+              does not implement code. Long-form narrative lives here;
+              <strong>binding decisions live in ADRs</strong> (see
+              <a href="#adr-catalog">ADR Catalog</a>). Any deviation requires a
+              new ADR and a revision of this document’s Architecture Version.
+            </p>
+          </div>
+
+
+          <section>
+            <h2 id="adr-catalog">Architecture Decision Record Catalog</h2>
+
+            <article>
+              <h3 id="adr-process">ADR Process</h3>
+              <p>
+                Every material architectural choice is recorded as an ADR.
+                Narrative sections in this document <strong>link</strong> to
+                ADRs; they do not re-litigate decisions. Expected scale as the
+                project grows: <strong>tens of ADRs</strong> (catalog may grow
+                substantially).
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>Rule</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>ID format</td>
+                      <td>
+                        <code>ADR-NNNN</code> (zero-padded, monotonic, never
+                        reused)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Status</td>
+                      <td>
+                        <code>Proposed</code> → <code>Accepted</code> →
+                        <code>Superseded by ADR-XXXX</code> |
+                        <code>Deprecated</code> | <code>Rejected</code>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Storage</td>
+                      <td>
+                        <code>docs/adr/ADR-NNNN-slug.md</code> (source of
+                        truth); this HTML indexes them
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Required sections</td>
+                      <td>
+                        Context · Decision · Alternatives · Pros/Cons ·
+                        Consequences · Migration · Scalability
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Who may accept</td>
+                      <td>
+                        Tech lead + one reviewer (or RFC vote for cross-cutting
+                        ADRs)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Linking rule</td>
+                      <td>
+                        Code comments and PRs cite <code>ADR-NNNN</code>; do not
+                        duplicate decision prose in random docs
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="callout architecture">
+                <div class="callout-title">Architecture Decision</div>
+                <p>
+                  When this document and an Accepted ADR disagree, the
+                  <strong>ADR wins</strong> until the document is revised.
+                  Superseded ADRs remain readable for history.
+                </p>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="adr-index-table">Baseline ADR Index (ADR-0001 …)</h3>
+              <p>
+                Initial catalog. New decisions append; they do not renumber.
+                Detail bodies will live under <code>docs/adr/</code>; until
+                then, “Detail” points at the narrative section that motivated
+                the ADR.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Title</th>
+                      <th>Status</th>
+                      <th>Summary</th>
+                      <th>Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td id="adr-0001"><strong>ADR-0001</strong></td>
+                      <td>Overall multi-process architecture</td>
+                      <td>Accepted</td>
+                      <td>
+                        UI · Core · hosts · remote agent; supervisor lifecycle
+                      </td>
+                      <td>
+                        <a href="#system-overview">System Overview</a>,
+                        <a href="#multiprocess">Multi-Process</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0002"><strong>ADR-0002</strong></td>
+                      <td>NRPC IPC protocol</td>
+                      <td>Accepted</td>
+                      <td>
+                        Framed multiplexed Cap’n Proto (hot path); versioned
+                        handshake
+                      </td>
+                      <td><a href="#ipc-protocol">IPC Protocol</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0003"><strong>ADR-0003</strong></td>
+                      <td>Rendering stack (winit + wgpu + custom UI)</td>
+                      <td>Accepted</td>
+                      <td>
+                        No Electron/Tauri/GPUI as product shell; own toolkit
+                      </td>
+                      <td><a href="#ui-framework">UI Framework</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0004"><strong>ADR-0004</strong></td>
+                      <td>Plugin isolation model</td>
+                      <td>Accepted</td>
+                      <td>
+                        Out-of-process plugin host; permissions; crash
+                        quarantine
+                      </td>
+                      <td>
+                        <a href="#plugins">Plugin System</a>,
+                        <a href="#plugin-sandbox">Sandbox</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0005"><strong>ADR-0005</strong></td>
+                      <td>Rope buffer + Buffer trait</td>
+                      <td>Accepted</td>
+                      <td>Large-file first; concrete rope behind trait</td>
+                      <td><a href="#buffer">Buffer Model</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0006"><strong>ADR-0006</strong></td>
+                      <td>Lua-first config; no Vimscript</td>
+                      <td>Accepted</td>
+                      <td>mlua + Lua 5.4; LuaJIT optional later</td>
+                      <td><a href="#configuration">Configuration</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0007"><strong>ADR-0007</strong></td>
+                      <td>Neovim compatibility as a layer</td>
+                      <td>Accepted</td>
+                      <td>
+                        Core never speaks Neovim; <code>vim.*</code> is
+                        translation only
+                      </td>
+                      <td><a href="#neovim-compat">Compat Layer</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0008"><strong>ADR-0008</strong></td>
+                      <td>Hybrid Git (gitoxide + CLI)</td>
+                      <td>Accepted</td>
+                      <td>
+                        Reads via gitoxide; complex writes via git CLI/hooks
+                      </td>
+                      <td><a href="#git">Git</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0009"><strong>ADR-0009</strong></td>
+                      <td>Remote model (local UI/core + remote agent)</td>
+                      <td>Accepted</td>
+                      <td>
+                        VS Code–like; agent owns remote FS/PTY/LSP/Git tools
+                      </td>
+                      <td><a href="#remote">Remote Development</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0010"><strong>ADR-0010</strong></td>
+                      <td>Stable Rust only (MSRV policy)</td>
+                      <td>Accepted</td>
+                      <td>
+                        No overnight nightly; MSRV documented; upgrade cadence
+                      </td>
+                      <td><a href="#versioning-policy">Versioning</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0011"><strong>ADR-0011</strong></td>
+                      <td>
+                        Crate ownership tiers (Public/Friend/Internal/Private)
+                      </td>
+                      <td>Accepted</td>
+                      <td>Dependency edges enforced by CI allowlists</td>
+                      <td><a href="#crate-ownership">Ownership</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0012"><strong>ADR-0012</strong></td>
+                      <td>Memory ownership &amp; sharing rules</td>
+                      <td>Accepted</td>
+                      <td>
+                        Who owns Buffer/Session/Viewport; Arc vs clone policy
+                      </td>
+                      <td><a href="#memory-ownership">Memory Ownership</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0013"><strong>ADR-0013</strong></td>
+                      <td>Error philosophy</td>
+                      <td>Accepted</td>
+                      <td>
+                        Result vs panic vs fatal vs recoverable degradation
+                      </td>
+                      <td><a href="#error-philosophy">Error Philosophy</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0014"><strong>ADR-0014</strong></td>
+                      <td>
+                        Terminal VT reuse (proven emulator +
+                        portable-pty/ConPTY)
+                      </td>
+                      <td>Accepted</td>
+                      <td>Do not invent full VT from scratch</td>
+                      <td><a href="#terminal">Terminal</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0015"><strong>ADR-0015</strong></td>
+                      <td>
+                        API surface versioning (product · plugin · NRPC ·
+                        settings)
+                      </td>
+                      <td>Accepted</td>
+                      <td>Independent semver tracks; deprecation windows</td>
+                      <td>
+                        <a href="#versioning-policy">Versioning Policy</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0016"><strong>ADR-0016</strong></td>
+                      <td>Workspace trust &amp; plugin permission defaults</td>
+                      <td>Accepted</td>
+                      <td>
+                        Default-deny sensitive caps; trust gates tasks/shell
+                      </td>
+                      <td><a href="#security">Security</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0017"><strong>ADR-0017</strong></td>
+                      <td>Supervisor process model</td>
+                      <td>Accepted</td>
+                      <td>
+                        Heartbeat, restart budgets, quarantine, partial
+                        degradation
+                      </td>
+                      <td>
+                        <a href="#failure-recovery">Failure Recovery</a>,
+                        <a href="#appendix-process-supervisor">Appendix</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0018"><strong>ADR-0018</strong></td>
+                      <td>Testing pyramid &amp; CI gates</td>
+                      <td>Accepted</td>
+                      <td>
+                        Unit · integration · snapshot/golden · fuzz · bench
+                        budgets
+                      </td>
+                      <td><a href="#testing">Testing</a></td>
+                    </tr>
+                    <tr>
+                      <td id="adr-0019"><strong>ADR-0019</strong></td>
+                      <td>Product evolution milestones (MVP→…→Cloud)</td>
+                      <td>Accepted</td>
+                      <td>
+                        Named product milestones independent of eng
+                        implementation phases
+                      </td>
+                      <td>
+                        <a href="#evolution-roadmap">Evolution Roadmap</a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="callout future">
+                <div class="callout-title">Future Work — ADR growth</div>
+                <p>
+                  Reserve <strong>ADR-0020+</strong> for: WASM plugins, DAP deep
+                  design, CRDT collab, marketplace PKI, renderer backend swap,
+                  LuaJIT backend, NRPC major v2, enterprise policy engine, etc.
+                </p>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="evolution-roadmap">
+              Evolution Roadmap (Product Milestones)
+            </h2>
+            <p>
+              Engineering phases (Phase 0…6 in
+              <a href="#roadmap">Implementation Roadmap</a>) are execution
+              slices. <strong>Product milestones</strong> below are what
+              contributors and users orient on. See
+              <a href="#adr-0019">ADR-0019</a>.
+            </p>
+
+            <figure class="diagram" aria-label="Product evolution">
+              <pre><code>  MVP          1.0           2.0         Enterprise        Cloud
+   │            │             │              │               │
+   ▼            ▼             ▼              ▼               ▼
+┌──────┐   ┌────────┐   ┌─────────┐   ┌───────────┐   ┌──────────┐
+│Daily │──►│Stable  │──►│Platform │──►│Policy /   │──►│Hosted    │
+│driver│   │public  │   │plugins  │   │airgap /   │   │workspaces│
+│IDE   │   │release │   │remote+  │   │SSO /      │   │team sync │
+│      │   │        │   │debugger │   │compliance │   │          │
+└──────┘   └────────┘   └─────────┘   └───────────┘   └──────────┘
+</code></pre>
+              <figcaption>
+                Figure E1 — Product evolution (not calendar-binding;
+                capacity-dependent)
+              </figcaption>
+            </figure>
+
+            <article>
+              <h3 id="milestone-definitions">Milestone Definitions</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Milestone</th>
+                      <th>Exit criteria (success)</th>
+                      <th>Intentionally deferred</th>
+                      <th>Where we are</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>MVP</strong></td>
+                      <td>
+                        Daily-driver for team; Lua config; LSP; terminal; git;
+                        basic SSH; installers
+                      </td>
+                      <td>
+                        WASM, full DAP, Dev Containers, 70%+ plugin matrix
+                      </td>
+                      <td class="mid">Current target</td>
+                    </tr>
+                    <tr>
+                      <td><strong>1.0</strong></td>
+                      <td>
+                        Public stable APIs (S1/S3); signed updates; crash/perf
+                        budgets; docs; marketplace v0
+                      </td>
+                      <td>Enterprise policy, multi-tenant cloud</td>
+                      <td>—</td>
+                    </tr>
+                    <tr>
+                      <td><strong>2.0</strong></td>
+                      <td>
+                        Remote parity (WSL/Docker/Dev Containers); DAP; Compat
+                        L2; WASM plugins experimental
+                      </td>
+                      <td>Full collab CRDT</td>
+                      <td>—</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Enterprise</strong></td>
+                      <td>
+                        Private registry, SSO hooks, airgap, workspace policy,
+                        audit logs, support channels
+                      </td>
+                      <td>SaaS multi-tenant</td>
+                      <td>—</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Cloud</strong></td>
+                      <td>
+                        Hosted remote workspaces; team settings sync; optional
+                        thin client
+                      </td>
+                      <td>Replacing local UI</td>
+                      <td>—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="callout note">
+                <div class="callout-title">Note — Contributor orientation</div>
+                <p>
+                  When opening a PR, state which <strong>milestone</strong> it
+                  serves (e.g. “MVP: keymap motions”). Features that only make
+                  sense at Enterprise/Cloud require explicit milestone tag and
+                  must not block MVP.
+                </p>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="risk-register">Risk Register</h2>
+            <p>
+              Enterprise-style living risk list. Severity:
+              <strong>H</strong> high · <strong>M</strong> medium ·
+              <strong>L</strong> low. Owners rotate; review each milestone exit.
+            </p>
+
+            <article>
+              <h3 id="risk-table">Architectural &amp; Product Risks</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Risk</th>
+                      <th>Sev</th>
+                      <th>Impact</th>
+                      <th>Mitigation</th>
+                      <th>Related ADR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>R-01</td>
+                      <td>
+                        <code>wgpu</code> / platform graphics stack abandoned or
+                        breaks on niche GPUs
+                      </td>
+                      <td>H</td>
+                      <td>Cannot ship UI on some machines</td>
+                      <td>
+                        Abstract <code>Renderer</code> trait; keep
+                        software/fallback path research; pin + vendor critical
+                        patches
+                      </td>
+                      <td><a href="#adr-0003">ADR-0003</a></td>
+                    </tr>
+                    <tr>
+                      <td>R-02</td>
+                      <td>
+                        Lua / Neovim plugin ecosystem expectations exceed compat
+                        layer
+                      </td>
+                      <td>H</td>
+                      <td>Reputation; “not real Neovim” backlash</td>
+                      <td>
+                        Honest matrix; native gold plugins; telemetry-driven
+                        L1/L2; never claim 100%
+                      </td>
+                      <td><a href="#adr-0007">ADR-0007</a></td>
+                    </tr>
+                    <tr>
+                      <td>R-03</td>
+                      <td>Vim motion / modal parity infinite scope</td>
+                      <td>H</td>
+                      <td>MVP never ships</td>
+                      <td>
+                        Motion tiers; dogfood gates; explicit “unsupported” list
+                      </td>
+                      <td><a href="#adr-0019">ADR-0019</a></td>
+                    </tr>
+                    <tr>
+                      <td>R-04</td>
+                      <td>Remote FS consistency / data loss</td>
+                      <td>H</td>
+                      <td>Trust destruction</td>
+                      <td>
+                        WAL, version vectors, conflict UI, reconnect tests
+                      </td>
+                      <td><a href="#adr-0009">ADR-0009</a></td>
+                    </tr>
+                    <tr>
+                      <td>R-05</td>
+                      <td>Malicious plugins / supply chain</td>
+                      <td>H</td>
+                      <td>RCE on developer machines</td>
+                      <td>
+                        Permissions, process isolation, signing (milestone
+                        1.0+), workspace trust
+                      </td>
+                      <td>
+                        <a href="#adr-0004">ADR-0004</a>,
+                        <a href="#adr-0016">ADR-0016</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>R-06</td>
+                      <td>Text rendering quality below WezTerm/Zed bar</td>
+                      <td>M</td>
+                      <td>Power users leave</td>
+                      <td>
+                        Reuse shaping (cosmic-text/HB); hire expertise; snapshot
+                        visual tests
+                      </td>
+                      <td><a href="#adr-0003">ADR-0003</a></td>
+                    </tr>
+                    <tr>
+                      <td>R-07</td>
+                      <td>
+                        IPC / multi-process complexity (latency, deadlocks)
+                      </td>
+                      <td>M</td>
+                      <td>Jank; hard bugs</td>
+                      <td>
+                        Strict NRPC budgets; single-process debug mode; fuzz
+                        codec
+                      </td>
+                      <td>
+                        <a href="#adr-0002">ADR-0002</a>,
+                        <a href="#adr-0017">ADR-0017</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>R-08</td>
+                      <td>Team understaffed vs roadmap</td>
+                      <td>M</td>
+                      <td>Slip; thrash</td>
+                      <td>
+                        Cut WASM/DAP first; protect buffer/UI core; milestone
+                        tags on PRs
+                      </td>
+                      <td><a href="#adr-0019">ADR-0019</a></td>
+                    </tr>
+                    <tr>
+                      <td>R-09</td>
+                      <td>MSRV / dependency churn breaks builds</td>
+                      <td>L</td>
+                      <td>Contributor friction</td>
+                      <td>MSRV CI job; dependabot policy; allowlist crates</td>
+                      <td><a href="#adr-0010">ADR-0010</a></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="crate-ownership">Crate Ownership Model</h2>
+            <p>
+              Large monorepos fail when “everything depends on everything.”
+              NVide uses four visibility tiers. Enforced by crate features,
+              <code>pub(crate)</code> discipline, and CI dependency allowlists.
+              See <a href="#adr-0011">ADR-0011</a>.
+            </p>
+
+            <article>
+              <h3 id="ownership-tiers">Visibility Tiers</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tier</th>
+                      <th>Who may depend</th>
+                      <th>Semver</th>
+                      <th>Examples</th>
+                      <th>Breaking change rule</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Public</strong></td>
+                      <td>External plugin authors, out-of-tree tools</td>
+                      <td>Strict semver; changelog</td>
+                      <td>
+                        <code>nvide-plugin-api</code>, documented Lua
+                        <code>nvide.*</code>
+                      </td>
+                      <td>Major bump + deprecation window</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Friend</strong></td>
+                      <td>First-party workspace crates only (allowlisted)</td>
+                      <td>Workspace-coordinated</td>
+                      <td>
+                        <code>nvide-ipc</code>, <code>nvide-rpc-schema</code>,
+                        <code>nvide-fs</code>
+                      </td>
+                      <td>Allowed in minor if all friends updated same PR</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Internal</strong></td>
+                      <td>Same process / same subsystem only</td>
+                      <td>Unstable</td>
+                      <td>
+                        <code>nvide-core</code> modules, host-private helpers
+                      </td>
+                      <td>Anytime within subsystem</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Private</strong></td>
+                      <td>
+                        Single crate; not <code>pub</code> outside module tree
+                      </td>
+                      <td>N/A</td>
+                      <td>Render atlas caches, rope node internals</td>
+                      <td>Unrestricted</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="crate-tier-map">Crate → Tier Map (baseline)</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Crate</th>
+                      <th>Tier</th>
+                      <th>Allowed dependents</th>
+                      <th>Must NOT depend on</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>nvide-buffer</code></td>
+                      <td>Friend</td>
+                      <td>core, syntax, search</td>
+                      <td>ui, plugin-host, render</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-syntax</code></td>
+                      <td>Friend</td>
+                      <td>core, render (highlight spans)</td>
+                      <td>ui chrome, plugins</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-platform</code></td>
+                      <td>Friend</td>
+                      <td>all first-party</td>
+                      <td>core/ui cycles</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-ipc</code> / schema</td>
+                      <td>Friend</td>
+                      <td>all processes</td>
+                      <td>buffer internals</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-core</code></td>
+                      <td>Internal</td>
+                      <td>binaries / thin facades only</td>
+                      <td>nvide-ui widgets</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-render</code></td>
+                      <td>Internal</td>
+                      <td>nvide-ui, nvide binary</td>
+                      <td>plugin-host, git</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-ui</code></td>
+                      <td>Internal</td>
+                      <td>nvide binary</td>
+                      <td>plugin-host, lang-host</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-plugin-api</code></td>
+                      <td>Public</td>
+                      <td>external + hosts</td>
+                      <td>core private types</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-compat-vim</code></td>
+                      <td>Internal</td>
+                      <td>plugin-host only</td>
+                      <td>ui, render</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-lsp</code> / dap</td>
+                      <td>Friend</td>
+                      <td>lang-host, core facades</td>
+                      <td>ui</td>
+                    </tr>
+                    <tr>
+                      <td><code>nvide-telemetry</code></td>
+                      <td>Friend</td>
+                      <td>opt-in callers</td>
+                      <td>nothing user-data by default</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="callout warning">
+                <div class="callout-title">Warning</div>
+                <p>
+                  <code>nvide-ui</code> and <code>nvide-render</code> must never
+                  import plugin host code. Violations are CI-failing
+                  architecture breaks, not style nits.
+                </p>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="versioning-policy">Versioning Policy</h2>
+            <p>
+              Multiple version clocks exist on purpose. Do not conflate product
+              release with plugin ABI. See <a href="#adr-0015">ADR-0015</a>,
+              <a href="#adr-0010">ADR-0010</a>.
+            </p>
+
+            <article>
+              <h3 id="version-clocks">Version Clocks</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Clock</th>
+                      <th>Scheme</th>
+                      <th>Example</th>
+                      <th>Breakage policy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Product (NVide app)</td>
+                      <td>Semver</td>
+                      <td><code>0.x</code> pre-1.0, then <code>1.0.0</code></td>
+                      <td>
+                        Marketing + installers; may ship many API minors inside
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Architecture document</td>
+                      <td>Semver</td>
+                      <td><code>0.2.0</code> (this file)</td>
+                      <td>
+                        Minor = additive sections; major = rewrite of model
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>ADR catalog</td>
+                      <td>Dated + IDs</td>
+                      <td><code>2026.07</code> / ADR-NNNN</td>
+                      <td>IDs immutable; status changes only</td>
+                    </tr>
+                    <tr>
+                      <td>Rust MSRV</td>
+                      <td>Version floor</td>
+                      <td><code>1.82</code></td>
+                      <td>
+                        Bump only with ADR note + CI; max N-2 stable preferred
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Plugin API (Rust SDK)</td>
+                      <td>Semver</td>
+                      <td><code>nvide-plugin-api 1.y</code></td>
+                      <td>See lifecycle below</td>
+                    </tr>
+                    <tr>
+                      <td>Lua <code>nvide.*</code></td>
+                      <td>Stable minor</td>
+                      <td>documented per release</td>
+                      <td>Deprecate ≥2 minors; remove on next product major</td>
+                    </tr>
+                    <tr>
+                      <td>Compat <code>vim.*</code></td>
+                      <td>Best-effort tiers</td>
+                      <td>L1/L2/L3</td>
+                      <td>No semver promise; matrix tracked</td>
+                    </tr>
+                    <tr>
+                      <td>NRPC schema</td>
+                      <td>major.minor</td>
+                      <td><code>1.4</code></td>
+                      <td>
+                        Add fields freely; never reuse field numbers; major
+                        dual-stack
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Settings keys</td>
+                      <td>Stable names</td>
+                      <td><code>editor.tabSize</code></td>
+                      <td>Rename via migration scripts only</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="plugin-api-lifecycle">Plugin API Lifecycle</h3>
+              <figure class="diagram">
+                <pre><code>  design     release      soft warn           hard warn          remove
+    │           │             │                   │                 │
+    ▼           ▼             ▼                   ▼                 ▼
+ [v2 draft] → [v2.0] → [v1 deprecated] → [v1 removed in] → [only v2+]
+                         still works         next major
+                         + diagnostics       product release</code></pre>
+                <figcaption>Figure V1 — Plugin API deprecation path</figcaption>
+              </figure>
+              <ol>
+                <li><strong>v1 current</strong> — MVP ships plugin API v1.</li>
+                <li>
+                  <strong>v2 introduced</strong> — both supported; docs prefer
+                  v2.
+                </li>
+                <li>
+                  <strong>v1 deprecated</strong> — runtime warning once per
+                  session; CI lints for first-party.
+                </li>
+                <li>
+                  <strong>v1 removed</strong> — only on product major (e.g.
+                  2.0); migration guide required.
+                </li>
+              </ol>
+              <p>
+                Minimum deprecation window:
+                <strong>one stable product minor</strong> or
+                <strong>90 days</strong>, whichever longer (except security
+                emergencies).
+              </p>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="dependency-diagram">Dependency Diagram</h2>
+            <p>
+              Allowed dependency direction is <strong>downward</strong> in the
+              diagram (higher layers depend on lower). Cycles are forbidden.
+              Complements the tree listing in
+              <a href="#workspace-layout">Cargo Workspace Layout</a>.
+            </p>
+
+            <article>
+              <h3 id="layer-graph">Layer Graph</h3>
+              <figure class="diagram">
+                <pre><code>                    ┌─────────────────────────┐
+                    │  binaries (nvide,       │
+                    │  *-host, agent)         │
+                    └───────────┬─────────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                 ▼
+        ┌──────────┐     ┌──────────┐      ┌────────────┐
+        │ nvide-ui │     │nvide-core│      │ host crates│
+        └────┬─────┘     └────┬─────┘      │ lsp git    │
+             │                │            │ term plugin│
+             ▼                │            └──────┬─────┘
+        ┌──────────┐          │                   │
+        │nvide-    │          │                   │
+        │render    │◄─────────┤ paint snapshots   │
+        └────┬─────┘          │                   │
+             │                ▼                   │
+             │         ┌────────────┐             │
+             │         │  syntax    │◄────────────┤
+             │         │  search    │             │
+             │         └─────┬──────┘             │
+             │               ▼                    │
+             │         ┌────────────┐             │
+             └────────►│  buffer    │◄────────────┘
+                       └─────┬──────┘
+                             ▼
+                       ┌────────────┐     ┌────────────┐
+                       │ platform   │◄────│ ipc/schema │
+                       └────────────┘     └────────────┘
+                             ▲
+                             │
+                       ┌─────┴──────┐
+                       │ plugin-api │  (Public — no upward deps into core private)
+                       └────────────┘</code></pre>
+                <figcaption>
+                  Figure D1 — Crate dependency layers (simplified)
+                </figcaption>
+              </figure>
+            </article>
+
+            <article>
+              <h3 id="dep-rules-summary">Hard Dependency Rules</h3>
+              <ul>
+                <li><code>buffer</code> → no IDE-specific crates.</li>
+                <li>
+                  <code>render</code> → may use <code>buffer</code> types for
+                  spans only via pure data DTOs when possible.
+                </li>
+                <li>
+                  <code>ui</code> → <code>render</code> + platform; never
+                  <code>plugin-host</code>.
+                </li>
+                <li>
+                  <code>compat-vim</code> → only through core façades /
+                  plugin-api traits.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="event-flows">Event Flows</h2>
+            <p>
+              Narrative data flows live in
+              <a href="#data-flow">Primary Data Flows</a>. Below are
+              sequence-style diagrams for implementers.
+            </p>
+
+            <article>
+              <h3 id="flow-typing">Typing Path (local)</h3>
+              <figure class="diagram">
+                <pre><code>UI process                         Core process                      Render path
+─────────                         ────────────                      ───────────
+Keyboard / IME
+   │
+   ▼
+Platform event
+   │
+   ▼
+Input router ──NRPC: KeyEvent──► Keymap engine
+                                      │
+                                      ▼
+                                 Buffer.apply_edit
+                                      │
+                         ┌────────────┼────────────┐
+                         ▼            ▼            ▼
+                     Undo node    Extmarks     version++
+                                      │
+                                      ▼
+                               Decoration / folds
+                                      │
+                    ◄── ViewportSnapshot ──│
+   │
+   ▼
+Layout → Shape → Atlas → GPU present</code></pre>
+                <figcaption>
+                  Figure F1 — Typing → buffer → decoration → GPU
+                </figcaption>
+              </figure>
+            </article>
+
+            <article>
+              <h3 id="flow-plugin">Plugin Callback Path</h3>
+              <figure class="diagram">
+                <pre><code>Core event bus ──NRPC──► Plugin host
+                            │
+                            ▼
+                      Lua / Rust plugin
+                            │  vim.* or nvide.*
+                            ▼
+                      Compat translate (if vim.*)
+                            │
+                            ▼
+                      Core API (edit / UI request)
+                            │
+              ┌─────────────┴─────────────┐
+              ▼                           ▼
+         State change                  UI process
+         + other listeners             (floats, notify)</code></pre>
+                <figcaption>Figure F2 — Plugin event round-trip</figcaption>
+              </figure>
+            </article>
+
+            <article>
+              <h3 id="flow-lsp">LSP Diagnostic Path</h3>
+              <figure class="diagram">
+                <pre><code>Buffer edit (core)
+   │ debounced
+   ▼
+Lang host ──stdio/NRPC──► Language server
+   ▲                            │
+   │     publishDiagnostics     │
+   ◄────────────────────────────┘
+   │
+   ▼
+Diagnostic store → extmarks → UI problems panel + gutter</code></pre>
+                <figcaption>Figure F3 — LSP diagnostics</figcaption>
+              </figure>
+            </article>
+
+            <article>
+              <h3 id="flow-remote">Remote Edit Path</h3>
+              <figure class="diagram">
+                <pre><code>Local UI/Core                      Remote agent
+     │                                  │
+     │  FS_READ / watch                 │
+     │─────────────────────────────────►│
+     │  chunks + events                │
+     │◄─────────────────────────────────│
+     │                                  │
+     │  local edit (buffer cache)       │
+     │  FS_WRITE (versioned)            │
+     │─────────────────────────────────►│
+     │  ACK / conflict                  │
+     │◄─────────────────────────────────│
+     │                                  │
+     │  LSP_* on remote                 │
+     │◄──────── stream ────────────────►│</code></pre>
+                <figcaption>Figure F4 — Remote FS + LSP</figcaption>
+              </figure>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="memory-ownership">Memory Ownership</h2>
+            <p>
+              Rust correctness at IDE scale depends on explicit ownership.
+              Default:
+              <strong
+                >one owner, many borrowed readers, Arc only at process/service
+                boundaries</strong
+              >. See <a href="#adr-0012">ADR-0012</a>.
+            </p>
+
+            <article>
+              <h3 id="who-owns-what">Who Owns What</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Object</th>
+                      <th>Owner</th>
+                      <th>Shared how</th>
+                      <th>Clone policy</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Buffer text (rope)</td>
+                      <td><code>nvide-core</code> BufferRegistry</td>
+                      <td>
+                        ID handles across processes; snapshots as immutable
+                        bytes/rope chunks
+                      </td>
+                      <td>
+                        Never clone full rope casually; prefer
+                        <code>slice</code> / snapshot handles
+                      </td>
+                      <td>Single-writer in core</td>
+                    </tr>
+                    <tr>
+                      <td>Buffer metadata / version</td>
+                      <td>Same as buffer</td>
+                      <td>Copy small structs</td>
+                      <td>Copy OK</td>
+                      <td>Monotonic <code>version</code> for LSP</td>
+                    </tr>
+                    <tr>
+                      <td>Viewport / window state</td>
+                      <td>Core window tree</td>
+                      <td>UI holds last paint snapshot (DTO)</td>
+                      <td>UI may clone DTO</td>
+                      <td>UI never mutates buffer</td>
+                    </tr>
+                    <tr>
+                      <td>Session / workspace</td>
+                      <td>Core Session</td>
+                      <td>
+                        <code>Arc&lt;SessionCfg&gt;</code> for immutable config
+                        OK
+                      </td>
+                      <td>Config Arc; live state exclusive</td>
+                      <td>Persisted to disk separately</td>
+                    </tr>
+                    <tr>
+                      <td>Extmark tree</td>
+                      <td>Buffer (core)</td>
+                      <td>Query results as owned Vec</td>
+                      <td>
+                        No shared mutable tree across threads without lock
+                      </td>
+                      <td>Interval tree private</td>
+                    </tr>
+                    <tr>
+                      <td>Plugin VM / Lua state</td>
+                      <td>Plugin host process</td>
+                      <td>Not shared with UI/core address space</td>
+                      <td>N/A</td>
+                      <td>Crash isolation</td>
+                    </tr>
+                    <tr>
+                      <td>GPU resources / atlas</td>
+                      <td>UI/render process</td>
+                      <td>Not sent over IPC</td>
+                      <td>No clone of GPU handles</td>
+                      <td>Recreate on device loss</td>
+                    </tr>
+                    <tr>
+                      <td>NRPC connections</td>
+                      <td>Each process runtime</td>
+                      <td><code>Arc&lt;Connection&gt;</code> inside process</td>
+                      <td>Arc clone for tasks OK</td>
+                      <td>No raw fd sharing without wrapper</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="arc-rc-rules">Arc / Rc / Mutex Rules</h3>
+              <ul>
+                <li>
+                  <strong><code>Rc</code> / <code>RefCell</code>:</strong>
+                  single-threaded UI or single-threaded subsystems only; never
+                  across await points that may move threads.
+                </li>
+                <li>
+                  <strong><code>Arc</code>:</strong> cross-thread immutable
+                  data, connection handles, service registries. Prefer
+                  <code>Arc&lt;T&gt;</code> where <code>T</code> is immutable or
+                  uses interior mutability sparingly.
+                </li>
+                <li>
+                  <strong><code>Mutex</code> / <code>RwLock</code>:</strong>
+                  short critical sections; no lock held across IPC await. Prefer
+                  message-passing to shared mutable state.
+                </li>
+                <li>
+                  <strong>Forbidden:</strong>
+                  <code>Arc&lt;Mutex&lt;Buffer&gt;&gt;</code> shared into UI for
+                  live editing — edits go through core commands only.
+                </li>
+                <li>
+                  <strong>Snapshots:</strong> for async consumers (LSP, search),
+                  take versioned immutable snapshots; drop if
+                  <code>version</code> mismatched on apply.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="error-philosophy">Error Philosophy</h2>
+            <p>
+              Unify failure handling early so contributors do not invent
+              per-crate conventions. See <a href="#adr-0013">ADR-0013</a>.
+            </p>
+
+            <article>
+              <h3 id="error-classes">Error Classes</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Class</th>
+                      <th>When</th>
+                      <th>Mechanism</th>
+                      <th>User-visible</th>
+                      <th>Example</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Expected / recoverable</strong></td>
+                      <td>IO, user input, network, plugin faults</td>
+                      <td>
+                        <code>Result&lt;T, E&gt;</code> + typed errors
+                        (<code>thiserror</code>)
+                      </td>
+                      <td>Toast / panel / inline</td>
+                      <td>File not found; LSP crash; SSH drop</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Degraded mode</strong></td>
+                      <td>Optional subsystem down</td>
+                      <td><code>Result</code> + feature flag / banner state</td>
+                      <td>Persistent status segment</td>
+                      <td>Git host restarting; lang host down</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Invariant violation (debug)</strong></td>
+                      <td>Internal bug detected in debug builds</td>
+                      <td><code>debug_assert!</code> / checked returns</td>
+                      <td>Dev-only</td>
+                      <td>Extmark offset past buffer end after fixup bug</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Fatal process</strong></td>
+                      <td>Unrecoverable process corruption</td>
+                      <td>
+                        Controlled abort after flush WAL; supervisor restarts
+                      </td>
+                      <td>Crash report prompt</td>
+                      <td>
+                        Core allocator corruption; UI GPU device lost loop
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Panic</strong></td>
+                      <td>Truly unreachable OR library panic</td>
+                      <td>
+                        Catch at process boundary (<code>catch_unwind</code>
+                        only at host edges); never across FFI unchecked
+                      </td>
+                      <td>If escapes: process restart</td>
+                      <td>
+                        Plugin host isolates panics per task where possible
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="error-rules">Hard Rules</h3>
+              <ul>
+                <li>
+                  Public / Friend APIs return <code>Result</code>; do not panic
+                  on user data.
+                </li>
+                <li>
+                  <code>unwrap()</code> / <code>expect()</code> only when
+                  invariant is locally proven; comment why; banned in hot paths
+                  without lint allow.
+                </li>
+                <li>
+                  IPC errors are always recoverable at the caller; never panic
+                  the UI thread for a failed plugin RPC.
+                </li>
+                <li>
+                  Logging: <code>error!</code> for recoverable ops failures;
+                  <code>error!</code>+metrics for restarts; no PII in logs by
+                  default.
+                </li>
+                <li>
+                  User-facing strings are separate from machine error codes
+                  (<code>nvide.error.fs.not_found</code>).
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="executive-summary">Executive Summary</h2>
+
+            <article>
+              <h3 id="what-is-nvide">What is NVide?</h3>
+              <p>
+                NVide is a <strong>from-scratch native IDE</strong> written in
+                Rust. It is not a Neovim fork, not a VS Code fork, and not an
+                Electron application. It targets developers who want the speed
+                and modal editing DNA of Neovim with the structured IDE features
+                of VS Code / JetBrains — without the memory tax of Chromium or
+                the C/Lua inheritance constraints of Neovim.
+              </p>
+              <p>The product differentiates on four pillars:</p>
+              <ol>
+                <li>
+                  <strong>Native performance</strong> — sub-100&nbsp;ms cold UI
+                  shell, multi-GB files via rope buffers, 120&nbsp;Hz GPU UI.
+                </li>
+                <li>
+                  <strong>Lua-native configuration</strong> —
+                  <code>init.lua</code> is first-class; no Vimscript ever.
+                </li>
+                <li>
+                  <strong>Compatibility without cloning</strong> — a translation
+                  layer presents a <code>vim.*</code> surface to plugins while
+                  the core uses clean Rust APIs.
+                </li>
+              </ol>
+            </article>
+
+            <article>
+              <h3 id="non-goals">Non-Goals (Strategic)</h3>
+              <ul>
+                <li>Embedding or forking Neovim’s C core.</li>
+                <li>Running Electron / Chromium for primary UI.</li>
+                <li>
+                  100% bug-for-bug Neovim API parity (see compatibility tiers).
+                </li>
+                <li>Supporting Vimscript.</li>
+                <li>
+                  Being a pure terminal TUI (GUI is primary; headless mode is
+                  secondary).
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="success-metrics">Success Metrics</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      <th>MVP Target</th>
+                      <th>Post-MVP Target</th>
+                      <th>Stretch</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Cold start to editable buffer</td>
+                      <td class="mid">&lt; 400 ms</td>
+                      <td class="good">&lt; 200 ms</td>
+                      <td class="good">&lt; 100 ms</td>
+                    </tr>
+                    <tr>
+                      <td>Idle RSS (empty workspace)</td>
+                      <td class="mid">&lt; 120 MB</td>
+                      <td class="good">&lt; 80 MB</td>
+                      <td class="good">&lt; 60 MB</td>
+                    </tr>
+                    <tr>
+                      <td>UI frame budget</td>
+                      <td>60 FPS</td>
+                      <td>120 FPS</td>
+                      <td>120+ FPS variable</td>
+                    </tr>
+                    <tr>
+                      <td>Open 1 GB file (scrollable)</td>
+                      <td class="good">&lt; 2 s</td>
+                      <td class="good">&lt; 500 ms</td>
+                      <td class="good">&lt; 200 ms</td>
+                    </tr>
+                    <tr>
+                      <td>Neovim plugin compatibility (Tier A)</td>
+                      <td class="mid">~40%</td>
+                      <td class="mid">~70%</td>
+                      <td class="good">~85%+</td>
+                    </tr>
+                    <tr>
+                      <td>Crash rate (sessions)</td>
+                      <td>&lt; 1%</td>
+                      <td>&lt; 0.1%</td>
+                      <td>&lt; 0.01%</td>
+                    </tr>
+                    <tr>
+                      <td>Remote reconnect mean time</td>
+                      <td>&lt; 5 s</td>
+                      <td>&lt; 2 s</td>
+                      <td>&lt; 1 s</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="vision">Vision &amp; Design Principles</h2>
+
+            <article>
+              <h3 id="principles">Architectural Principles</h3>
+              <div class="card-grid">
+                <div class="card">
+                  <h4>P1 — Process Isolation First</h4>
+                  <p>
+                    UI, core, plugins, language servers, and remote hosts never
+                    share an address space unless explicitly opted in. A plugin
+                    crash must never take down the editor.
+                  </p>
+                </div>
+                <div class="card">
+                  <h4>P2 — Stable Surfaces, Flexible Internals</h4>
+                  <p>
+                    Public APIs (Rust crate versions, Lua <code>nvide.*</code>,
+                    compat <code>vim.*</code>, RPC protocol) versioned
+                    independently of internal refactors.
+                  </p>
+                </div>
+                <div class="card">
+                  <h4>P3 — Lua Is Configuration DNA</h4>
+                  <p>
+                    Every user-facing setting, keymap, and plugin entry point is
+                    expressible in Lua. No parallel config language.
+                  </p>
+                </div>
+                <div class="card">
+                  <h4>P4 — Compatibility Is a Layer, Not the Core</h4>
+                  <p>
+                    The editor core never speaks Neovim. A dedicated
+                    compatibility service translates. Core stays clean and
+                    independent of plugin-ecosystem churn.
+                  </p>
+                </div>
+                <div class="card">
+                  <h4>P5 — Measure, Then Ship</h4>
+                  <p>
+                    Performance budgets are enforced in CI. No regression
+                    without an ADR waiver.
+                  </p>
+                </div>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="users">Primary User Personas</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Persona</th>
+                      <th>Needs</th>
+                      <th>Architecture implications</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Neovim power user</td>
+                      <td>Lua config, plugins, modal editing, speed</td>
+                      <td>Compat layer, hot reload, low latency input</td>
+                    </tr>
+                    <tr>
+                      <td>Polyglot professional</td>
+                      <td>LSP, debug, git, multi-root</td>
+                      <td>Language host process, DAP, multi-workspace</td>
+                    </tr>
+                    <tr>
+                      <td>Remote / container dev</td>
+                      <td>SSH, WSL, Dev Containers</td>
+                      <td>Remote protocol, FS proxy, reconnect</td>
+                    </tr>
+                    <tr>
+                      <td>Enterprise admin</td>
+                      <td>Trust, signing, policy, offline</td>
+                      <td>Workspace trust, marketplace verify, airgap</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="system-overview">System Overview</h2>
+
+            <article>
+              <h3 id="high-level">High-Level Topology</h3>
+              <p>
+                NVide is a <strong>multi-process, message-oriented IDE</strong>.
+                The GUI process is thin; durable state and language intelligence
+                live in workers. Communication uses a versioned binary RPC
+                (Cap’n Proto or similar; see
+                <a href="#multiprocess">Multi-Process / IPC</a>,
+                <a href="#adr-0002">ADR-0002</a>) over local IPC (Unix domain
+                sockets / named pipes) and over the remote transport when the
+                workspace is remote.
+              </p>
+
+              <figure class="diagram" aria-label="High-level process topology">
+                <pre><code>┌──────────────────────────────────────────────────────────────────────────┐
+│                          HOST MACHINE (local UI)                         │
+│                                                                          │
+│  ┌─────────────┐    IPC     ┌──────────────────────────────────────────┐ │
+│  │  nvide-ui   │◄──────────►│              nvide-core                  │ │
+│  │  (GPU GUI)  │  events    │  buffers · windows · sessions · config   │ │
+│  │  winit+wgpu │  frames    │  keymap · undo · workspace · trust       │ │
+│  └──────┬──────┘            └───────┬──────────────────┬───────────────┘ │
+│         │                           │                  │                 │
+│         │                    ┌──────▼──────┐    ┌──────▼──────┐          │
+│         │                    │ plugin-host │    │  lang-host  │          │
+│         │                    │ Lua / Rust  │    │  LSP / DAP  │          │
+│         │                    │ WASM (later)│    │  formatters │          │
+│         │                    └──────┬──────┘    └──────┬──────┘          │
+│         │                           │                  │                 │
+│         │                    ┌──────────────────────────────┐            │
+│         │                    │  git-host (gitoxide + CLI)   │            │
+│         │                    └──────────────────────────────┘            │
+│         │                                                                │
+│         │  optional: terminal-host (PTY isolation)                       │
+└─────────┼────────────────────────────────────────────────────────────────┘
+          │
+          │  Remote Protocol (TLS / SSH mux / named pipe to WSL)
+          ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                     REMOTE / WSL / CONTAINER AGENT                       │
+│  nvide-agent: FS · PTY · LSP · Git · file watchers                      │
+└──────────────────────────────────────────────────────────────────────────┘</code></pre>
+                <figcaption>
+                  Figure 1 — Multi-process topology (local UI + optional remote
+                  agent)
+                </figcaption>
+              </figure>
+            </article>
+
+            <article>
+              <h3 id="process-roles">Process Roles</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Process</th>
+                      <th>Binary</th>
+                      <th>Responsibility</th>
+                      <th>Crash impact</th>
+                      <th>Restart policy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>UI</td>
+                      <td><code>nvide</code></td>
+                      <td>Window, input, GPU render, layout</td>
+                      <td>Session ends (state in core)</td>
+                      <td>User relaunch; core may persist</td>
+                    </tr>
+                    <tr>
+                      <td>Core</td>
+                      <td><code>nvide-core</code></td>
+                      <td>Editor state, config, orchestration</td>
+                      <td>Critical; autosave/recovery</td>
+                      <td>Supervisor relaunch + recovery</td>
+                    </tr>
+                    <tr>
+                      <td>Plugin host</td>
+                      <td><code>nvide-plugin-host</code></td>
+                      <td>Lua/Rust/WASM plugins</td>
+                      <td>Plugins only</td>
+                      <td>Per-plugin or full host restart</td>
+                    </tr>
+                    <tr>
+                      <td>Lang host</td>
+                      <td><code>nvide-lang</code></td>
+                      <td>LSP/DAP client lifecycle</td>
+                      <td>IntelliSense gap</td>
+                      <td>Auto restart servers</td>
+                    </tr>
+                    <tr>
+                      <td>Git host</td>
+                      <td><code>nvide-git</code></td>
+                      <td>Status, diff, blame, ops</td>
+                      <td>SCM UI stale</td>
+                      <td>Auto restart</td>
+                    </tr>
+                    <tr>
+                      <td>Terminal host</td>
+                      <td><code>nvide-term</code></td>
+                      <td>PTY / ConPTY sessions</td>
+                      <td>Terminals die</td>
+                      <td>Optional restore</td>
+                    </tr>
+                    <tr>
+                      <td>Remote agent</td>
+                      <td><code>nvide-agent</code></td>
+                      <td>Remote FS/LSP/PTY/Git tools</td>
+                      <td>Remote workspace offline</td>
+                      <td>Reconnect + resume</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="callout architecture">
+                <div class="callout-title">
+                  Architecture Decision — Supervisor model
+                </div>
+                <p>
+                  <strong>Why:</strong> Long-lived IDEs need supervised
+                  children. A thin supervisor (embedded in core or a tiny
+                  parent) owns lifecycle, crash dumps, and restart budgets.
+                </p>
+                <p>
+                  <strong>Alternatives:</strong> Single process (rejected —
+                  crash blast radius); OS service managers only (rejected — poor
+                  Windows/macOS UX parity).
+                </p>
+                <p>
+                  <strong>Migration:</strong> Processes speak a versioned
+                  handshake; new process types can be added without UI changes.
+                </p>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="data-flow">Primary Data Flows</h3>
+              <p>Sequence diagrams: <a href="#event-flows">Event Flows</a>.</p>
+              <ol>
+                <li>
+                  <strong>Typing path:</strong> UI key event → core keymap →
+                  buffer mutation → dirty viewport → UI paint commands (glyph
+                  runs + decorations).
+                </li>
+                <li>
+                  <strong>Plugin path:</strong> Core event bus → plugin host RPC
+                  → Lua callback → core API → state change → UI.
+                </li>
+                <li>
+                  <strong>LSP path:</strong> Buffer change → debounced didChange
+                  → lang host → server → diagnostics/completion → core → UI
+                  overlays.
+                </li>
+                <li>
+                  <strong>Remote path:</strong> Same logical RPCs; transport is
+                  multiplexed over SSH/WSL/Docker; agent executes FS/PTY/LSP
+                  locally on remote.
+                </li>
+              </ol>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="multiprocess">Multi-Process Architecture &amp; IPC</h2>
+
+            <article>
+              <h3 id="ipc-protocol">IPC Protocol Design</h3>
+              <p>
+                All inter-process communication uses
+                <strong>NVide RPC (NRPC)</strong> — a framed, multiplexed,
+                bidirectional protocol.
+              </p>
+              <h4>Wire format</h4>
+              <ul>
+                <li>
+                  <strong>Transport:</strong> Unix domain sockets (Linux/macOS),
+                  named pipes (Windows), vsock/SSH channel (remote).
+                </li>
+                <li>
+                  <strong>Framing:</strong> length-prefixed messages (u32 LE) +
+                  stream id (u32) + flags (u16) + payload.
+                </li>
+                <li>
+                  <strong>Serialization:</strong> Cap’n Proto (zero-copy reads)
+                  for hot paths; MessagePack allowed for plugin Lua bridge
+                  convenience.
+                </li>
+                <li>
+                  <strong>Streams:</strong> multiplex request/response, server
+                  push, and binary blobs (file chunks, terminal bytes).
+                </li>
+                <li>
+                  <strong>Versioning:</strong> major.minor in handshake; minor
+                  is backward compatible; major requires dual-stack or upgrade.
+                </li>
+              </ul>
+
+              <pre><code class="language-text">NRPC Frame
+┌──────────┬──────────┬────────┬────────────────────────────┐
+│ len u32  │ stream   │ flags  │ payload (Cap'n Proto/msg)  │
+│          │ id u32   │ u16    │                            │
+└──────────┴──────────┴────────┴────────────────────────────┘
+Flags: REQ | RESP | PUSH | ERR | CANCEL | COMPRESSED | PRIORITY</code></pre>
+
+              <h4>Message categories</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Examples</th>
+                      <th>Latency budget</th>
+                      <th>Ordering</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Input / edit</td>
+                      <td>KeyEvent, ApplyEdit</td>
+                      <td>&lt; 2 ms local</td>
+                      <td>Strict per-buffer</td>
+                    </tr>
+                    <tr>
+                      <td>UI paint</td>
+                      <td>ViewportSnapshot, Decorations</td>
+                      <td>&lt; 8 ms</td>
+                      <td>Latest-wins coalesced</td>
+                    </tr>
+                    <tr>
+                      <td>LSP</td>
+                      <td>Completion, Diagnostics</td>
+                      <td>50–200 ms</td>
+                      <td>Per-request cancelable</td>
+                    </tr>
+                    <tr>
+                      <td>FS</td>
+                      <td>Read, Write, Watch</td>
+                      <td>varies</td>
+                      <td>Per-path queue</td>
+                    </tr>
+                    <tr>
+                      <td>Terminal</td>
+                      <td>PTY bytes</td>
+                      <td>streaming</td>
+                      <td>Byte-ordered stream</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="callout performance">
+                <div class="callout-title">Performance — Coalescing</div>
+                <p>
+                  UI paint and diagnostic pushes are coalesced. Only the latest
+                  viewport for a window is rendered. Edit events are never
+                  dropped but may batch under high load with deterministic merge
+                  of adjacent inserts.
+                </p>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="failure-recovery">Failure Recovery</h3>
+              <ul>
+                <li>
+                  <strong>Heartbeat:</strong> 1 s ping; 3 missed → unhealthy; 5
+                  s → restart child.
+                </li>
+                <li>
+                  <strong>Crash dump:</strong> minidump/breakpad-style; uploaded
+                  only with user consent.
+                </li>
+                <li>
+                  <strong>State durability:</strong> core writes WAL for buffers
+                  (see crash restore); plugins rehydrate from disk manifests.
+                </li>
+                <li>
+                  <strong>Restart budgets:</strong> exponential backoff; after N
+                  crashes in window, quarantine plugin or disable feature with
+                  user notification.
+                </li>
+                <li>
+                  <strong>Partial degradation:</strong> UI remains usable
+                  without git/lang; banners indicate degraded mode.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="single-process-dev">Developer Escape Hatch</h3>
+              <p>
+                For debugging, <code>NVIDE_SINGLE_PROCESS=1</code> embeds hosts
+                as threads/tasks. Not for production releases. Keeps the same
+                API surface so tests can run both modes.
+              </p>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="monorepo">Modular Monorepo &amp; Crate Boundaries</h2>
+
+            <article>
+              <h3 id="workspace-layout">Cargo Workspace Layout</h3>
+              <pre><code class="language-text">nvide/
+├── Cargo.toml                 # workspace root
+├── crates/
+│   ├── nvide/                 # UI binary (thin)
+│   ├── nvide-core/            # editor state machine
+│   ├── nvide-buffer/          # rope, piece ops, undo
+│   ├── nvide-syntax/          # treesitter integration
+│   ├── nvide-render/          # GPU text + layout primitives
+│   ├── nvide-ui/              # widgets, dock, theme
+│   ├── nvide-platform/        # OS abstractions (clipboard, paths)
+│   ├── nvide-ipc/             # NRPC types + transport
+│   ├── nvide-rpc-schema/      # Cap'n Proto / schema gen
+│   ├── nvide-config/          # settings model
+│   ├── nvide-lua/             # Lua runtime embedding
+│   ├── nvide-plugin-api/      # stable Rust plugin SDK
+│   ├── nvide-plugin-host/     # plugin process
+│   ├── nvide-compat-vim/      # vim.* translation layer
+│   ├── nvide-lsp/             # LSP client
+│   ├── nvide-dap/             # DAP client
+│   ├── nvide-lang-host/       # language process
+│   ├── nvide-git/             # git operations
+│   ├── nvide-term/            # PTY + terminal emulator
+│   ├── nvide-remote/          # remote protocol client
+│   ├── nvide-agent/           # remote agent binary
+│   ├── nvide-fs/              # VFS (local + remote)
+│   ├── nvide-search/          # ripgrep-style search
+│   ├── nvide-task/            # tasks / test runner
+│   ├── nvide-security/        # trust, perms, secrets
+│   ├── nvide-update/          # auto-update
+│   └── nvide-telemetry/       # opt-in metrics / crash
+├── plugins/                   # first-party Lua/Rust plugins
+├── grammars/                  # vendored tree-sitter grammars
+├── schemas/                   # RPC + settings JSON schemas
+├── docs/                      # architecture, ADRs
+├── benches/                   # criterion benches
+└── tests/                     # integration / e2e</code></pre>
+            </article>
+
+            <article>
+              <h3 id="dependency-rules">Dependency Rules</h3>
+              <p>
+                See also <a href="#crate-ownership">Crate Ownership</a>,
+                <a href="#dependency-diagram">Dependency Diagram</a>, and
+                <a href="#adr-0011">ADR-0011</a>.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Rule</th>
+                      <th>Rationale</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <code>nvide-buffer</code> depends on nothing
+                        IDE-specific
+                      </td>
+                      <td>Reusable, highly tested core</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>nvide-ui</code> must not depend on
+                        <code>nvide-plugin-host</code>
+                      </td>
+                      <td>UI remains thin; no plugin code in GPU process</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>nvide-compat-vim</code> may depend on core APIs
+                        only via traits
+                      </td>
+                      <td>
+                        Compatibility can be ripped out without core rewrite
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>No cyclic crate deps (enforced by cargo + CI)</td>
+                      <td>Compile-time architecture</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Third-party crates: audited allowlist for UI/security
+                        crates
+                      </td>
+                      <td>Supply chain</td>
+                    </tr>
+                    <tr>
+                      <td>Stable only; nightly only with ADR + sunset date</td>
+                      <td>Long-term maintainability</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="callout architecture">
+                <div class="callout-title">
+                  Architecture Decision — Layered crates
+                </div>
+                <p>
+                  <strong>Why:</strong> JetBrains Platform and VS Code both
+                  suffer when “the app” is one blob. Explicit crates force API
+                  thinking.
+                </p>
+                <p>
+                  <strong>Pros:</strong> parallel CI, clear ownership,
+                  testability, future extraction (e.g. buffer as library).
+                </p>
+                <p>
+                  <strong>Cons:</strong> more boilerplate, version coordination.
+                </p>
+                <p>
+                  <strong>Migration:</strong> crates can split further; public
+                  plugins bind only to <code>nvide-plugin-api</code> semver.
+                </p>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="api-stability">API Stability Tiers</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tier</th>
+                      <th>Surface</th>
+                      <th>Stability</th>
+                      <th>Breaking policy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>S0</td>
+                      <td>Internal crates</td>
+                      <td>Unstable</td>
+                      <td>Anytime within monorepo</td>
+                    </tr>
+                    <tr>
+                      <td>S1</td>
+                      <td><code>nvide.*</code> Lua API</td>
+                      <td>Stable minor</td>
+                      <td>Deprecate 2 minors, remove next major</td>
+                    </tr>
+                    <tr>
+                      <td>S2</td>
+                      <td><code>vim.*</code> compat</td>
+                      <td>Best-effort + tiers</td>
+                      <td>Track Neovim LTS; document gaps</td>
+                    </tr>
+                    <tr>
+                      <td>S3</td>
+                      <td>Rust plugin SDK</td>
+                      <td>Semver</td>
+                      <td>Semver major for breaks</td>
+                    </tr>
+                    <tr>
+                      <td>S4</td>
+                      <td>NRPC schema</td>
+                      <td>Schema evolution</td>
+                      <td>Add fields; never reuse numbers</td>
+                    </tr>
+                    <tr>
+                      <td>S5</td>
+                      <td>Settings keys</td>
+                      <td>Stable</td>
+                      <td>Rename via migration scripts</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="ui-framework">
+              UI Framework Evaluation &amp; Recommendation
+            </h2>
+
+            <article>
+              <h3 id="ui-comparison">Framework Comparison</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Option</th>
+                      <th>Pros</th>
+                      <th>Cons</th>
+                      <th>Complexity</th>
+                      <th>Performance</th>
+                      <th>Maintainability</th>
+                      <th>Future scalability</th>
+                      <th>Migration cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>GPUI</strong> (Zed)</td>
+                      <td>Proven IDE UI; GPU; reactive</td>
+                      <td>
+                        Tied to Zed ecosystem; API churn; licensing/coupling
+                        risk
+                      </td>
+                      <td class="mid">High</td>
+                      <td class="good">Excellent</td>
+                      <td class="mid">Medium (external driver)</td>
+                      <td class="mid">Depends on Zed</td>
+                      <td class="bad">High</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Slint</strong></td>
+                      <td>Native, polished DSL, multi-backend</td>
+                      <td>
+                        DSL learning; less code-editor specific; commercial
+                        license tiers
+                      </td>
+                      <td class="mid">Medium</td>
+                      <td class="good">Good</td>
+                      <td class="good">Good</td>
+                      <td class="good">Good</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                    <tr>
+                      <td><strong>egui</strong></td>
+                      <td>Immediate mode simplicity; pure Rust</td>
+                      <td>
+                        Accessibility weak; large UIs harder; look-and-feel
+                        limited
+                      </td>
+                      <td class="good">Low</td>
+                      <td class="mid">Good for tools</td>
+                      <td class="mid">Medium</td>
+                      <td class="mid">Limited for IDE chrome</td>
+                      <td class="good">Low–Med</td>
+                    </tr>
+                    <tr>
+                      <td><strong>iced</strong></td>
+                      <td>Elm architecture; growing</td>
+                      <td>
+                        Still maturing for IDE density; text editing primitives
+                        immature
+                      </td>
+                      <td class="mid">Medium</td>
+                      <td class="mid">Good</td>
+                      <td class="mid">Medium</td>
+                      <td class="mid">Uncertain</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Tauri</strong></td>
+                      <td>Web UI velocity; small vs Electron</td>
+                      <td>WebView memory/consistency; not “native IDE” goal</td>
+                      <td class="good">Low–Med</td>
+                      <td class="bad">Weaker than GPU native</td>
+                      <td class="mid">Medium</td>
+                      <td class="mid">Web stack lock-in</td>
+                      <td class="bad">High if leaving web</td>
+                    </tr>
+                    <tr>
+                      <td><strong>winit + wgpu + custom</strong></td>
+                      <td>
+                        Full control; matches WezTerm/Zed-class; 10y ownership
+                      </td>
+                      <td>Must build widgets/a11y; higher initial cost</td>
+                      <td class="bad">Highest initially</td>
+                      <td class="good">Excellent</td>
+                      <td class="good">Excellent if layered</td>
+                      <td class="good">Best</td>
+                      <td class="mid">Widget toolkit internal only</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="decision">
+                <h4>
+                  Decision: winit + wgpu + custom UI toolkit (<code
+                    >nvide-ui</code
+                  >
+                  / <code>nvide-render</code>)
+                </h4>
+                <dl>
+                  <dt>Status</dt>
+                  <dd>Accepted (<a href="#adr-0003">ADR-0003</a>)</dd>
+                  <dt>Why</dt>
+                  <dd>
+                    Maximum control for text rendering, multi-window, high-DPI,
+                    and long-term ownership of the rendering stack. Avoids
+                    WebView and external framework risk. Matches the performance
+                    bar of WezTerm/Zed without adopting another product’s UI
+                    framework as a dependency.
+                  </dd>
+                  <dt>Alternatives rejected</dt>
+                  <dd>
+                    Tauri (violates native/no-Electron spirit), pure egui (a11y
+                    + IDE density), GPUI (coupling/churn).
+                  </dd>
+                  <dt>Mitigation</dt>
+                  <dd>
+                    Borrow proven algorithms (glyph cache, atlas, damage
+                    regions) from open literature and open-source; do not invent
+                    text shaping. Use <code>cosmic-text</code> /
+                    <code>swash</code> / HarfBuzz bindings for shaping.
+                  </dd>
+                  <dt>Migration</dt>
+                  <dd>
+                    UI toolkit is internal. If a mature Rust UI framework
+                    becomes clearly superior later, reimplement widgets against
+                    the same retained scene graph interface — core never paints.
+                  </dd>
+                  <dt>Scalability</dt>
+                  <dd>
+                    Scene graph + damage tracking scales to multi-monitor 5K and
+                    many splits; GPU path is the long-term bet.
+                  </dd>
+                </dl>
+              </div>
+
+              <div class="callout recommendation">
+                <div class="callout-title">Recommendation</div>
+                <p>
+                  Invest early in a small, excellent retained-mode toolkit
+                  (layout, focus, a11y tree, virtualization). Prototype with
+                  egui only for internal debug panels if needed — never for the
+                  product shell.
+                </p>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="ui-shell">Application Shell Design</h3>
+              <p>
+                The shell is a
+                <strong>dockable, multi-window IDE frame</strong> similar to VS
+                Code / JetBrains, with modal-first editing in the center.
+              </p>
+
+              <figure class="diagram">
+                <pre><code>┌─ Title / menu ─────────────────────────────────────────────[— □ ×]─┐
+│ Activity │  Breadcrumb / Tabs ──────────────────────────── Minimap │
+│ Bar      ├─────────────────────────────────────────────────────────┤
+│          │                                                         │
+│  Explorer│           Editor Group (splits)                         │
+│  Search  │   ┌──────────────┬──────────────────┐                   │
+│  Git     │   │  Buffer A    │   Buffer B       │                   │
+│  Debug   │   │              │                  │                   │
+│          │   └──────────────┴──────────────────┘                   │
+│  Ext     ├─────────────────────────────────────────────────────────┤
+│          │ Bottom: Terminal | Problems | Output | Debug Console    │
+│          ├─────────────────────────────────────────────────────────┤
+│          │ Status: mode · branch · LSP · cursor · encoding         │
+└──────────┴─────────────────────────────────────────────────────────┘
+         Command Palette (Ctrl/Cmd+Shift+P) overlays center</code></pre>
+                <figcaption>Figure 2 — Default dock layout</figcaption>
+              </figure>
+
+              <h4>Components</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Component</th>
+                      <th>Behavior</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Dock layout</td>
+                      <td>Drag-drop panels; save layout per workspace</td>
+                      <td>Serialized JSON layout model</td>
+                    </tr>
+                    <tr>
+                      <td>Sidebar</td>
+                      <td>Activity bar + primary side panel</td>
+                      <td>Virtualized trees</td>
+                    </tr>
+                    <tr>
+                      <td>Bottom panel</td>
+                      <td>Terminal, problems, output, debug</td>
+                      <td>Multi-tab</td>
+                    </tr>
+                    <tr>
+                      <td>Command palette</td>
+                      <td>Fuzzy command + file + symbol</td>
+                      <td>Async providers</td>
+                    </tr>
+                    <tr>
+                      <td>Explorer</td>
+                      <td>VFS tree, multi-root</td>
+                      <td>Git decorations</td>
+                    </tr>
+                    <tr>
+                      <td>Search panel</td>
+                      <td>Project find/replace</td>
+                      <td>Uses <code>nvide-search</code></td>
+                    </tr>
+                    <tr>
+                      <td>Problems</td>
+                      <td>Diagnostics aggregate</td>
+                      <td>Filter by severity/source</td>
+                    </tr>
+                    <tr>
+                      <td>Terminal panel</td>
+                      <td>Multiplexed terminals</td>
+                      <td>
+                        <a href="#terminal">Terminal</a> ·
+                        <a href="#adr-0014">ADR-0014</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Git panel</td>
+                      <td>Changes, stage, commit</td>
+                      <td>
+                        <a href="#git">Git</a> ·
+                        <a href="#adr-0008">ADR-0008</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Debug panel</td>
+                      <td>Variables, stacks, breakpoints</td>
+                      <td>DAP</td>
+                    </tr>
+                    <tr>
+                      <td>Notifications</td>
+                      <td>Toasts + notification center</td>
+                      <td>Permission prompts</td>
+                    </tr>
+                    <tr>
+                      <td>Status bar</td>
+                      <td>Extensible segments</td>
+                      <td>Lua/Rust contributions</td>
+                    </tr>
+                    <tr>
+                      <td>Minimap</td>
+                      <td>Optional GPU overview</td>
+                      <td>Disable for perf</td>
+                    </tr>
+                    <tr>
+                      <td>Breadcrumb</td>
+                      <td>Symbol path from LSP/treesitter</td>
+                      <td>Click to navigate</td>
+                    </tr>
+                    <tr>
+                      <td>Tabs / splits</td>
+                      <td>Editor groups, grid splits</td>
+                      <td>Vim-like + mouse</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h4>Theme &amp; icon engines</h4>
+              <ul>
+                <li>
+                  <strong>Theme:</strong> semantic tokens (editor.background,
+                  keyword.fg, …) + UI tokens. JSON/TOML themes; VS Code theme
+                  importer as a compatibility tool (not core dependency).
+                </li>
+                <li>
+                  <strong>Icons:</strong> SVG atlas; file icon themes;
+                  monochrome + color sets; high-DPI mipmaps.
+                </li>
+                <li>
+                  <strong>Animation:</strong> 150–200 ms ease for panels;
+                  respect <code>prefers-reduced-motion</code>.
+                </li>
+              </ul>
+
+              <h4>Accessibility, DPI, multi-monitor</h4>
+              <ul>
+                <li>
+                  Platform accessibility bridges (UI Automation /
+                  NSAccessibility / AT-SPI) for chrome; editor content exposes
+                  caret/selection via platform APIs where feasible.
+                </li>
+                <li>
+                  Per-monitor DPI; fractional scaling on Linux; crisp text via
+                  subpixel or grayscale AA selectable.
+                </li>
+                <li>
+                  Multi-window: each window owns a GPU surface; shared core
+                  session.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="editor-core">Editor Core</h2>
+
+            <article>
+              <h3 id="buffer">Buffer Model</h3>
+              <p>
+                A <strong>Buffer</strong> is the unit of editable text. Buffers
+                may be file-backed, anonymous, or virtual (diff, preview).
+              </p>
+
+              <h4>Piece Table vs Rope</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Structure</th>
+                      <th>Pros</th>
+                      <th>Cons</th>
+                      <th>Complexity</th>
+                      <th>Performance</th>
+                      <th>Maintainability</th>
+                      <th>Scalability</th>
+                      <th>Migration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Piece Table</td>
+                      <td>
+                        Simple undo; great for sequential edits; used by VS
+                        historically
+                      </td>
+                      <td>
+                        Degrades with random access without index; line lookups
+                        need cache
+                      </td>
+                      <td class="good">Low–Med</td>
+                      <td class="mid">Good small/medium</td>
+                      <td class="good">High</td>
+                      <td class="mid">Needs secondary index for large files</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Rope (recommended)</strong></td>
+                      <td>
+                        O(log n) split/merge; strong for huge files; chunked
+                        concurrent reads
+                      </td>
+                      <td>More complex; careful UTF-8 boundaries</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">Excellent large files</td>
+                      <td class="good">High with mature crate</td>
+                      <td class="good">Excellent</td>
+                      <td class="mid">Trait-based swap possible</td>
+                    </tr>
+                    <tr>
+                      <td>Gap Buffer</td>
+                      <td>Fast local edits</td>
+                      <td>Poor multi-cursor / large jumps</td>
+                      <td class="good">Low</td>
+                      <td class="mid">Local only</td>
+                      <td class="good">High</td>
+                      <td class="bad">Poor</td>
+                      <td class="good">Low</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="decision">
+                <h4>
+                  Decision: Rope with line index cache
+                  (<code>nvide-buffer</code>)
+                </h4>
+                <dl>
+                  <dt>Status</dt>
+                  <dd>Accepted (<a href="#adr-0005">ADR-0005</a>)</dd>
+                  <dt>Why</dt>
+                  <dd>
+                    Large-file and multi-cursor workloads dominate IDE life.
+                    Rope (e.g. based on <code>ropey</code> algorithms, possibly
+                    forked/custom for CRDT-friendly ops later) wins on
+                    asymptotic behavior.
+                  </dd>
+                  <dt>Design</dt>
+                  <dd>
+                    <code>Buffer</code> trait: <code>insert</code>,
+                    <code>delete</code>, <code>slice</code>, <code>line</code>,
+                    <code>line_count</code>, <code>char_to_byte</code>. Default
+                    impl: rope + line starts index + optional chunk mmap for
+                    read-only huge files.
+                  </dd>
+                  <dt>Migration</dt>
+                  <dd>
+                    All core code depends on <code>Buffer</code> trait, not
+                    concrete rope. Can introduce piece-table backend for tiny
+                    scratch buffers if profiling warrants.
+                  </dd>
+                </dl>
+              </div>
+
+              <pre><code class="language-rust">pub struct BufferId(u64);
+
+pub struct Buffer {
+    id: BufferId,
+    text: Rope,
+    line_index: LineIndex,
+    encoding: Encoding,
+    file: Option&lt;FileMeta&gt;,
+    dirty: bool,
+    version: u64,           // monotonic for LSP
+    marks: MarkMap,
+    extmarks: ExtmarkTree,  // interval tree
+    undo: UndoTree,
+    read_only: bool,
+}</code></pre>
+            </article>
+
+            <article>
+              <h3 id="cursor-selection">Cursor, Selection, Multi-Cursor</h3>
+              <ul>
+                <li>
+                  <strong>Cursor:</strong> (buffer_id, point) where point is
+                  (line, col) + affinity (before/after grapheme).
+                </li>
+                <li>
+                  <strong>Selection:</strong> ordered range with anchor + head;
+                  supports block (rect) selection.
+                </li>
+                <li>
+                  <strong>Multi-cursor:</strong> list of carets; edits applied
+                  as a single transactional batch with shared undo node.
+                </li>
+                <li>
+                  Columns are <strong>display columns</strong> for rendering and
+                  <strong>char indices</strong> for buffer ops — conversion
+                  layer handles tabs/wide glyphs.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="registers-macros">Registers &amp; Macros</h3>
+              <ul>
+                <li>
+                  Named registers (a–z, A–Z append), unnamed, clipboard alias
+                  (<code>+</code>/<code>*</code>), expression, search, black
+                  hole.
+                </li>
+                <li>
+                  Macro recorder stores key event stream (not resolved actions)
+                  so remaps can be handled consistently; optional “resolved
+                  action” mode for robustness.
+                </li>
+                <li>Registers serialize into session for restore.</li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="undo">Undo Tree</h3>
+              <p>
+                Branching undo tree (not linear stack), inspired by Neovim/Vim
+                undo trees and modern editors.
+              </p>
+              <ul>
+                <li>
+                  Each node: inverse operations + timestamp + cursor snapshot.
+                </li>
+                <li>
+                  Coalescing: typing within timeout merges nodes; explicit
+                  breakpoints on mode change / paste / external edit.
+                </li>
+                <li>
+                  Persistent undo: optional disk-backed undo history per file
+                  hash.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="viewport-scroll">Viewport &amp; Scrolling</h3>
+              <ul>
+                <li>
+                  Viewport = visible line range + horizontal scroll + fold map +
+                  wrapped line cache.
+                </li>
+                <li>
+                  Scrolling: pixel-smooth optional; default line-based for modal
+                  users.
+                </li>
+                <li>Virtual lines for folds, inlay hints, virtual text.</li>
+                <li>
+                  Damage regions: only re-shape and re-upload dirty glyph runs.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="rendering-pipeline">Rendering Pipeline</h3>
+              <figure class="diagram">
+                <pre><code>Buffer + Extmarks + Highlights + Folds
+            │
+            ▼
+   Layout pass (wrap, fold, inlays)  ──►  VisualLine[]
+            │
+            ▼
+   Syntax/Semantic color resolve     ──►  StyledSpan[]
+            │
+            ▼
+   Shaping (cosmic-text / HB)        ──►  GlyphRun[]
+            │
+            ▼
+   Atlas upload + instance buffer    ──►  GPU
+            │
+            ▼
+   Compositor: text + selections + carets + UI chrome
+            │
+            ▼
+   Present (vsync / mailbox)</code></pre>
+                <figcaption>Figure 3 — Editor rendering pipeline</figcaption>
+              </figure>
+              <div class="callout performance">
+                <div class="callout-title">Performance</div>
+                <p>
+                  Target: shape only visible ± overscan lines. Cache shaped
+                  lines by (buffer_version, theme_gen, width). Large files never
+                  fully shape.
+                </p>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="syntax-treesitter">Syntax Highlight &amp; Tree-sitter</h3>
+              <ul>
+                <li>
+                  Tree-sitter for incremental parse; grammars loaded
+                  dynamically.
+                </li>
+                <li>
+                  Highlight queries produce capture ranges → theme mapping.
+                </li>
+                <li>
+                  Async parse on background thread; apply when version matches.
+                </li>
+                <li>
+                  Semantic tokens from LSP overlay and win on conflict when
+                  enabled.
+                </li>
+                <li>
+                  Injection languages (markdown code blocks, SQL in strings)
+                  supported via TS injections.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="extmarks">Extmarks, Virtual Text, Folds</h3>
+              <p>
+                An <strong>extmark</strong> is an anchored decoration/range that
+                survives edits (Neovim-compatible concept, independent
+                implementation).
+              </p>
+              <ul>
+                <li>
+                  Stored in interval tree keyed by buffer byte positions with
+                  gravity.
+                </li>
+                <li>
+                  Uses: diagnostics underlines, search matches, breakpoints,
+                  coverage, inlay hints, virtual text lines.
+                </li>
+                <li>
+                  Folds: tree of fold ranges; provider from treesitter, LSP,
+                  indent, manual.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="search-replace">Search &amp; Replace</h3>
+              <ul>
+                <li>
+                  Buffer search: literal, regex (Rust regex), smartcase;
+                  multi-cursor “select all matches”.
+                </li>
+                <li>
+                  Project search: streaming ripgrep-class engine in
+                  <code>nvide-search</code>; respects gitignore; remote agent
+                  runs search on remote FS.
+                </li>
+                <li>
+                  Replace all: transactional multi-buffer edits with single undo
+                  group option.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="navigation">Jump List, Marks, Windows, Tabs</h3>
+              <ul>
+                <li>
+                  <strong>Jump list:</strong> per-window history of positions;
+                  tagged jumps from LSP/goto.
+                </li>
+                <li>
+                  <strong>Marks:</strong> local a–z, global A–Z, numbered;
+                  file+position persistence.
+                </li>
+                <li>
+                  <strong>Windows:</strong> splits in editor groups; layout tree
+                  (row/col nodes).
+                </li>
+                <li>
+                  <strong>Tabs:</strong> editor group tabs + optional “tab
+                  pages” for workspace layouts (Neovim-like).
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="workspace-session">
+                Workspace, Session, Autosave, Recovery
+              </h3>
+              <ul>
+                <li>
+                  <strong>Workspace:</strong> multi-root folders, trust state,
+                  tasks, launch configs, layout.
+                </li>
+                <li>
+                  <strong>Session restore:</strong> open buffers, cursors,
+                  folds, layout, terminal CWDs (not secrets).
+                </li>
+                <li>
+                  <strong>Autosave:</strong> configurable debounce; never saves
+                  unsaved “Untitled” without path.
+                </li>
+                <li>
+                  <strong>Crash recovery:</strong> WAL of unsaved buffer
+                  snapshots under user data dir; restore wizard on next launch.
+                </li>
+                <li>
+                  <strong>Swap/recovery files:</strong> per-file recovery blobs
+                  with mtime/hash checks.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="clipboard">Clipboard</h3>
+              <ul>
+                <li>
+                  System clipboard via platform APIs; optional OSC 52 for remote
+                  terminals.
+                </li>
+                <li>
+                  Internal ring history (yank history) independent of OS
+                  clipboard.
+                </li>
+                <li>Large clipboard payloads: async set to avoid UI jank.</li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="configuration">Lua-First Configuration</h2>
+
+            <article>
+              <h3 id="config-layout">Config Directory Layout</h3>
+              <pre><code class="language-text">~/.config/nvide/                 # or platform equivalent
+├── init.lua                     # entry
+├── lazy-lock.json               # optional plugin lock
+├── plugins/                     # user plugin specs / local plugins
+│   └── tools.lua
+├── config/
+│   ├── options.lua
+│   ├── keymaps.lua
+│   ├── autocmds.lua
+│   └── lsp.lua
+└── after/
+    └── plugin/                  # runs after plugins load
+        └── overrides.lua</code></pre>
+              <p>
+                Load order: <code>init.lua</code> → core defaults → plugin
+                bootstrap → plugin configs → <code>after/</code>. Explicit,
+                documented, and overridable.
+              </p>
+            </article>
+
+            <article>
+              <h3 id="lua-runtime">Lua Runtime Choice</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Option</th>
+                      <th>Pros</th>
+                      <th>Cons</th>
+                      <th>Complexity</th>
+                      <th>Performance</th>
+                      <th>Maintainability</th>
+                      <th>Scalability</th>
+                      <th>Migration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>mlua + Lua 5.4</strong></td>
+                      <td>Safe Rust bindings; sandbox options; portable</td>
+                      <td>Slower than LuaJIT for heavy plugins</td>
+                      <td class="good">Medium</td>
+                      <td class="mid">Good</td>
+                      <td class="good">Excellent</td>
+                      <td class="good">Good</td>
+                      <td class="good">Low</td>
+                    </tr>
+                    <tr>
+                      <td>LuaJIT</td>
+                      <td>Faster; familiar to Neovim users</td>
+                      <td>
+                        Not pure 5.4; FFI risk; platform quirks; ARM story
+                        historically complex
+                      </td>
+                      <td class="mid">Medium–High</td>
+                      <td class="good">Excellent</td>
+                      <td class="mid">Medium</td>
+                      <td class="mid">FFI hazards</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="decision">
+                <h4>
+                  Decision: mlua with Lua 5.4; optional LuaJIT build flag later
+                </h4>
+                <dl>
+                  <dt>Why</dt>
+                  <dd>
+                    Safety and long-term portability first. Most config code is
+                    not JIT-bound; heavy work should be Rust plugins or WASM.
+                  </dd>
+                  <dt>Compat</dt>
+                  <dd>
+                    Document subset differences; provide shims for common
+                    LuaJIT-isms where cheap.
+                  </dd>
+                  <dt>Future</dt>
+                  <dd>
+                    Feature-flag LuaJIT backend if plugin ecosystem demands it;
+                    same host API.
+                  </dd>
+                </dl>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="settings-keymaps">Settings &amp; Keymaps</h3>
+              <pre><code class="language-lua">-- config/options.lua
+local o = nvide.opt
+o.number = true
+o.relativenumber = true
+o.tabstop = 4
+o.expandtab = true
+o.signcolumn = "yes"
+
+-- config/keymaps.lua
+local map = nvide.keymap.set
+map("n", "&lt;leader&gt;ff", function()
+  nvide.cmd("FindFiles")
+end, { desc = "Find files" })
+
+-- Native API preferred; vim.* available via compat
+vim.keymap.set("n", "gd", vim.lsp.buf.definition)</code></pre>
+              <p>
+                Settings live in a typed Rust settings store; Lua bindings are
+                generated from schema. Changes emit events for UI/plugins.
+              </p>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="plugins">Plugin System</h2>
+
+            <article>
+              <h3 id="plugin-types">Plugin Types</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Runtime</th>
+                      <th>Use case</th>
+                      <th>Isolation</th>
+                      <th>Hot reload</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Lua</td>
+                      <td>Plugin host Lua VM</td>
+                      <td>Config, UI glue, Neovim ports</td>
+                      <td>Host process; optional per-plugin state tables</td>
+                      <td>Yes</td>
+                    </tr>
+                    <tr>
+                      <td>Rust (cdylib)</td>
+                      <td>Loaded in plugin host via stable ABI / RPC</td>
+                      <td>Performance features</td>
+                      <td>Process or dynamic lib sandbox</td>
+                      <td>Limited (reload host)</td>
+                    </tr>
+                    <tr>
+                      <td>WASM (future)</td>
+                      <td>Wasmtime</td>
+                      <td>Portable sandboxed plugins</td>
+                      <td>Strong</td>
+                      <td>Yes</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="plugin-lifecycle">Lifecycle</h3>
+              <ol>
+                <li>
+                  <strong>Discover</strong> — registry, local path, git URL,
+                  lockfile.
+                </li>
+                <li>
+                  <strong>Resolve</strong> — dependency graph (semver), detect
+                  cycles, compute load order.
+                </li>
+                <li>
+                  <strong>Fetch / update</strong> — download with hash verify;
+                  optional signature.
+                </li>
+                <li>
+                  <strong>Load</strong> — create plugin context; inject APIs;
+                  run setup.
+                </li>
+                <li>
+                  <strong>Activate</strong> — lazy events (filetype, command,
+                  keymap) or eager.
+                </li>
+                <li>
+                  <strong>Runtime</strong> — handle events; call core via RPC.
+                </li>
+                <li>
+                  <strong>Deactivate / unload</strong> — cleanup autocmds, UI
+                  contributions, timers.
+                </li>
+                <li>
+                  <strong>Crash recovery</strong> — quarantine plugin; notify;
+                  optional safe mode.
+                </li>
+              </ol>
+            </article>
+
+            <article>
+              <h3 id="plugin-sandbox">Sandbox, Permissions, Isolation</h3>
+              <div class="callout security">
+                <div class="callout-title">Security</div>
+                <p>
+                  Default-deny sensitive capabilities. Plugins declare required
+                  permissions in manifest. User grants at install or first use
+                  (similar to mobile + VS Code workspace trust hybrid).
+                </p>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Permission</th>
+                      <th>Examples</th>
+                      <th>Default</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>fs.read</code></td>
+                      <td>Read workspace files</td>
+                      <td>Workspace only</td>
+                    </tr>
+                    <tr>
+                      <td><code>fs.write</code></td>
+                      <td>Modify files</td>
+                      <td>Prompt</td>
+                    </tr>
+                    <tr>
+                      <td><code>fs.home</code></td>
+                      <td>Read outside workspace</td>
+                      <td>Deny / prompt</td>
+                    </tr>
+                    <tr>
+                      <td><code>net</code></td>
+                      <td>HTTP/TCP</td>
+                      <td>Deny</td>
+                    </tr>
+                    <tr>
+                      <td><code>shell</code></td>
+                      <td>Run processes</td>
+                      <td>Deny</td>
+                    </tr>
+                    <tr>
+                      <td><code>clipboard</code></td>
+                      <td>Read clipboard</td>
+                      <td>Prompt</td>
+                    </tr>
+                    <tr>
+                      <td><code>ui</code></td>
+                      <td>Custom panels</td>
+                      <td>Allow</td>
+                    </tr>
+                    <tr>
+                      <td><code>lsp</code></td>
+                      <td>Talk to language servers</td>
+                      <td>Allow</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p>
+                Rust dynamic plugins should prefer
+                <strong>out-of-process</strong> with RPC over in-process
+                <code>dlopen</code> for crash isolation. In-process allowed only
+                for trusted first-party or signed enterprise plugins.
+              </p>
+            </article>
+
+            <article>
+              <h3 id="plugin-registry">Registry, Versioning, Updates</h3>
+              <ul>
+                <li>
+                  Official registry (HTTPS index) + allow private registries.
+                </li>
+                <li>Lockfile pins commit/version/hash.</li>
+                <li>Update channels: stable / pre-release.</li>
+                <li>
+                  Dependency graph: topological load; peer dependency warnings.
+                </li>
+                <li>
+                  Hot reload Lua: re-run module with cleanup hooks; detect
+                  leaked autocmds.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="neovim-compat">Neovim Compatibility Layer</h2>
+
+            <article>
+              <h3 id="compat-philosophy">Philosophy</h3>
+              <p>
+                NVide is <strong>not Neovim</strong>. It implements a
+                <strong>compatibility façade</strong> that presents a familiar
+                <code>vim</code> global to Lua plugins. Internally, every call
+                translates to NVide core operations. We maximize practical
+                plugin compatibility without cloning Neovim internals,
+                Vimscript, or C structures.
+              </p>
+
+              <div class="callout compatibility">
+                <div class="callout-title">
+                  Compatibility — Estimated ceiling
+                </div>
+                <p>
+                  <strong>Realistic long-term estimate:</strong> ~70–85% of
+                  pure-Lua plugins that stick to documented Neovim APIs. Plugins
+                  that depend on Vimscript, undocumented C internals, specific
+                  buffer implementation quirks, or <code>vim.loop</code> FFI
+                  will fail unless rewritten.
+                </p>
+                <p>
+                  <strong>MVP estimate:</strong> ~35–45% of popular pure-Lua
+                  plugins with Tier A APIs implemented; rising as tiers expand.
+                </p>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="compat-levels">Compatibility Levels</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Level</th>
+                      <th>Meaning</th>
+                      <th>Examples</th>
+                      <th>Support commitment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>L0 — Native</strong></td>
+                      <td>NVide-first API</td>
+                      <td><code>nvide.buf</code>, <code>nvide.cmd</code></td>
+                      <td>Full, versioned</td>
+                    </tr>
+                    <tr>
+                      <td><strong>L1 — Core compat</strong></td>
+                      <td>Faithful enough for most plugins</td>
+                      <td>
+                        <code>vim.api</code> buffer/window,
+                        <code>vim.keymap</code>, <code>vim.opt</code>,
+                        <code>vim.notify</code>, <code>vim.schedule</code>
+                      </td>
+                      <td>High priority</td>
+                    </tr>
+                    <tr>
+                      <td><strong>L2 — Extended</strong></td>
+                      <td>Common but deeper</td>
+                      <td>
+                        <code>vim.lsp</code>, <code>vim.diagnostic</code>,
+                        <code>vim.ui</code>, <code>vim.treesitter</code>
+                      </td>
+                      <td>Phased</td>
+                    </tr>
+                    <tr>
+                      <td><strong>L3 — Emulated</strong></td>
+                      <td>Behavioral subset / polyfill</td>
+                      <td>
+                        parts of <code>vim.fn</code>,
+                        <code>vim.loop</code> subset
+                      </td>
+                      <td>Best-effort</td>
+                    </tr>
+                    <tr>
+                      <td><strong>L4 — Unsupported</strong></td>
+                      <td>Will not implement</td>
+                      <td>
+                        Vimscript, <code>:python</code>, RPC UI protocol as
+                        Neovim, internal C structs
+                      </td>
+                      <td>None</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="vim-api-surface">API Surface Design</h3>
+
+              <details open>
+                <summary><code>vim.api</code> — L1</summary>
+                <div class="details-body">
+                  <p>
+                    Implement as thin wrappers over core buffer/window/tabpage
+                    IDs. Maintain Neovim-like integer IDs via mapping tables
+                    (NVide UUID/u64 ↔ compat int).
+                  </p>
+                  <ul>
+                    <li>
+                      Buffer: create, delete, get/set lines, get name, set
+                      option, attach events (streamed as Lua callbacks).
+                    </li>
+                    <li>
+                      Window: open/close, get cursor, set cursor, get buf,
+                      config for floats.
+                    </li>
+                    <li>
+                      Extmarks: full namespace API mapped to NVide extmark tree.
+                    </li>
+                    <li>
+                      Autocmds / commands / keymaps: registered into core event
+                      system.
+                    </li>
+                  </ul>
+                  <p>
+                    <strong>Do not emulate:</strong> exact error strings, every
+                    edge-case of deprecated APIs, channel/job control identical
+                    to Neovim unless needed.
+                  </p>
+                </div>
+              </details>
+
+              <details>
+                <summary><code>vim.fn</code> — L3 (selective)</summary>
+                <div class="details-body">
+                  <p>
+                    Hundreds of functions exist in Vim. Strategy: implement by
+                    demand analytics from popular plugins. Categories:
+                  </p>
+                  <ul>
+                    <li>
+                      <strong>Must:</strong> <code>expand</code>,
+                      <code>fnamemodify</code>, <code>glob</code>,
+                      <code>filereadable</code>,
+                      <code>json_encode/decode</code>, <code>stdpath</code>,
+                      <code>getcwd</code>, <code>has</code>,
+                      <code>executable</code>.
+                    </li>
+                    <li>
+                      <strong>Should:</strong> <code>system</code>/<code
+                        >systemlist</code
+                      >
+                      (permission-gated), <code>bufadd</code>,
+                      <code>bufname</code>, <code>line</code>, <code>col</code>.
+                    </li>
+                    <li>
+                      <strong>Won’t:</strong> obscure legacy, GUI Vim-only,
+                      Vimscript-eval based.
+                    </li>
+                  </ul>
+                </div>
+              </details>
+
+              <details>
+                <summary><code>vim.loop</code> — L3 (subset of libuv)</summary>
+                <div class="details-body">
+                  <p>
+                    Expose async FS, timers, TCP/pipe via host-mediated APIs —
+                    not raw libuv FFI. This is critical for sandboxing. Plugins
+                    using <code>ffi</code> to touch libuv directly are
+                    unsupported.
+                  </p>
+                  <p>Map to Rust async runtime (tokio) in plugin host.</p>
+                </div>
+              </details>
+
+              <details>
+                <summary><code>vim.ui</code> — L2</summary>
+                <div class="details-body">
+                  <p>
+                    <code>vim.ui.select</code>, <code>vim.ui.input</code> →
+                    native UI widgets in UI process via RPC. Plugins get
+                    callbacks when user completes.
+                  </p>
+                </div>
+              </details>
+
+              <details>
+                <summary>
+                  <code>vim.lsp</code> / <code>vim.diagnostic</code> — L2
+                </summary>
+                <div class="details-body">
+                  <p>
+                    Do not reimplement language servers inside Lua. Bridge to
+                    <code>nvide-lsp</code> / diagnostic store. Provide
+                    Neovim-shaped client object enough for
+                    <code>nvim-lspconfig</code>-style configs and common plugins
+                    (trouble.nvim-class UIs).
+                  </p>
+                  <p>
+                    Some plugins assume Neovim’s exact client lifecycle; provide
+                    adapters and first-party <code>nvide-lspconfig</code> as the
+                    recommended path.
+                  </p>
+                </div>
+              </details>
+
+              <details>
+                <summary>
+                  <code>vim.notify</code> / <code>vim.schedule</code> /
+                  <code>vim.keymap</code> / <code>vim.opt</code> — L1
+                </summary>
+                <div class="details-body">
+                  <p>
+                    High value, relatively small surface.
+                    <code>vim.schedule</code> queues onto plugin host main loop.
+                    <code>vim.opt</code> mirrors settings store with metatables
+                    for
+                    <code>.get</code>/<code>.set</code>/<code>.append</code>.
+                  </p>
+                </div>
+              </details>
+
+              <details>
+                <summary>
+                  <code>vim.g</code> / <code>vim.b</code> / <code>vim.w</code> /
+                  <code>vim.bo</code> / <code>vim.wo</code> — L1/L2
+                </summary>
+                <div class="details-body">
+                  <p>
+                    Global and scoped variables stored in core maps;
+                    buffer/window options validated against schema. Unknown
+                    options: store but warn once (compat for plugins setting
+                    obsolete opts).
+                  </p>
+                </div>
+              </details>
+
+              <details>
+                <summary><code>vim.treesitter</code> — L2</summary>
+                <div class="details-body">
+                  <p>
+                    Wrap NVide’s tree-sitter service: parsers, queries,
+                    highlighters. Language tree objects are handles, not raw C
+                    pointers. FFI to parser C APIs unsupported.
+                  </p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="compat-translation">Translation Architecture</h3>
+              <figure class="diagram">
+                <pre><code>Lua plugin
+   │  vim.api.nvim_buf_set_lines(...)
+   ▼
+compat-vim (Lua + Rust)
+   │  map buf id → BufferId
+   │  validate ranges
+   ▼
+plugin-host RPC
+   ▼
+nvide-core BufferService.apply_edit(...)
+   ▼
+events → other plugins / LSP / UI</code></pre>
+                <figcaption>Figure 4 — Compat call path</figcaption>
+              </figure>
+              <p>
+                <strong>What to emulate:</strong> documented Lua API behavior,
+                option names popular plugins need, autocmd event names, floating
+                window config fields.
+              </p>
+              <p>
+                <strong>What not to emulate:</strong> Vimscript engine, Neovim
+                UI protocol clients, exact memory layout, every historical bug,
+                <code>vim.mpack</code> edge cases, provider frameworks for
+                clipboard/python.
+              </p>
+            </article>
+
+            <article>
+              <h3 id="compat-strategy">
+                Maximizing Compatibility Without Cloning
+              </h3>
+              <ol>
+                <li>
+                  Maintain a
+                  <strong>plugin compatibility test suite</strong> that installs
+                  top N plugins and runs smoke tests.
+                </li>
+                <li>
+                  Telemetry (opt-in): which <code>vim.*</code> functions fail
+                  most — drive backlog.
+                </li>
+                <li>
+                  Ship <strong>NVide-native ports</strong> of critical plugins
+                  (statusline, fuzzy finder, file tree) as gold standards.
+                </li>
+                <li>
+                  Publish a compatibility matrix site (generated from CI).
+                </li>
+                <li>
+                  Provide <code>nvide.compat.report()</code> for users to see
+                  unsupported calls in their config.
+                </li>
+              </ol>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="language-features">Language Features (LSP, DAP, Tools)</h2>
+
+            <article>
+              <h3 id="lsp-manager">LSP Manager</h3>
+              <ul>
+                <li>Runs in <code>nvide-lang</code> process.</li>
+                <li>
+                  Server lifecycle: install (optional), start, initialize,
+                  capability merge, restart on crash.
+                </li>
+                <li>
+                  Multi-server per buffer (e.g. typst + ltex); result merge
+                  policies.
+                </li>
+                <li>
+                  Remote: servers run on remote agent; protocol is still LSP
+                  over agent transport, not tunneled stdin alone when possible
+                  (agent owns process).
+                </li>
+              </ul>
+              <p>
+                Features implemented in core clients: completion, hover,
+                signature help, definition, references, rename, code actions,
+                semantic tokens, inlay hints, formatting, diagnostics, workspace
+                symbols, call hierarchy, code lens.
+              </p>
+            </article>
+
+            <article>
+              <h3 id="dap-manager">DAP Manager</h3>
+              <ul>
+                <li>Debug Adapter Protocol client in lang host.</li>
+                <li>
+                  Breakpoints as extmarks; UI panels for stacks, variables,
+                  watch, repl.
+                </li>
+                <li>Launch/attach configs in workspace (JSON or Lua).</li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="formatters-tasks">Formatters, Tasks, Tests</h3>
+              <ul>
+                <li>
+                  Formatters: LSP format preferred; external formatters via task
+                  runners with document range support.
+                </li>
+                <li>
+                  Task runner: VS Code–style tasks.json + Lua API; problem
+                  matchers.
+                </li>
+                <li>
+                  Test runner: discover via LSP/code lenses/adapters; gutter run
+                  icons; result panel.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="terminal">Terminal Subsystem</h2>
+
+            <article>
+              <h3 id="term-libs">Library Evaluation</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Library / approach</th>
+                      <th>Pros</th>
+                      <th>Cons</th>
+                      <th>Complexity</th>
+                      <th>Performance</th>
+                      <th>Maintainability</th>
+                      <th>Scalability</th>
+                      <th>Migration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>alacritty_terminal / wezterm VT</strong></td>
+                      <td>Battle-tested VT; GPU-friendly models</td>
+                      <td>Integration work; license review</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">Excellent</td>
+                      <td class="good">Good</td>
+                      <td class="good">Excellent</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                    <tr>
+                      <td>portable-pty + custom VT</td>
+                      <td>Control</td>
+                      <td>Years of ANSI edge cases</td>
+                      <td class="bad">High</td>
+                      <td class="mid">Variable</td>
+                      <td class="mid">Hard</td>
+                      <td class="mid">Medium</td>
+                      <td class="bad">High</td>
+                    </tr>
+                    <tr>
+                      <td>Embed WezTerm as process</td>
+                      <td>Fast to ship</td>
+                      <td>UX inconsistency; IPC heavy</td>
+                      <td class="good">Low</td>
+                      <td class="good">Good</td>
+                      <td class="mid">Coupling</td>
+                      <td class="mid">Medium</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="decision">
+                <h4>
+                  Decision: portable-pty / ConPTY + proven VT emulator crate
+                  (WezTerm/Alacritty lineage)
+                </h4>
+                <dl>
+                  <dt>Why</dt>
+                  <dd>
+                    Correct terminal emulation is years of edge cases; reuse a
+                    mature VT parser, own the PTY lifecycle and UI integration.
+                  </dd>
+                  <dt>Windows</dt>
+                  <dd>
+                    ConPTY required for modern Windows; fallback paths
+                    documented.
+                  </dd>
+                  <dt>Linux/macOS</dt>
+                  <dd>POSIX PTY; correct WINCH, sessions, login shells.</dd>
+                </dl>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="term-arch">Architecture</h3>
+              <ul>
+                <li>
+                  <code>nvide-term</code> process owns PTYs so a runaway process
+                  cannot block core.
+                </li>
+                <li>
+                  Multiplexing: many terminal tabs/panels → one host; each
+                  session is a stream.
+                </li>
+                <li>
+                  Scrollback: ring buffer with optional disk spill for huge
+                  output.
+                </li>
+                <li>
+                  Remote terminals: PTY on remote agent; bytes streamed over
+                  NRPC; local VT renders.
+                </li>
+                <li>
+                  Links, OSC 7/8, shell integration (optional) for CWD and
+                  command markers.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="git">Git Subsystem</h2>
+
+            <article>
+              <h3 id="git-backend">Backend Evaluation</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Backend</th>
+                      <th>Pros</th>
+                      <th>Cons</th>
+                      <th>Complexity</th>
+                      <th>Performance</th>
+                      <th>Maintainability</th>
+                      <th>Scalability</th>
+                      <th>Migration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>gitoxide (gix)</strong></td>
+                      <td>
+                        Pure Rust; safe; good for status/diff/blame read paths
+                      </td>
+                      <td>Some write/ops still maturing vs full git</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">Excellent reads</td>
+                      <td class="good">High</td>
+                      <td class="good">Good</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                    <tr>
+                      <td>libgit2 (git2-rs)</td>
+                      <td>Mature; many ops</td>
+                      <td>C dep; thread/safety footguns; binary size</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">Good</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">Good</td>
+                      <td class="mid">Medium</td>
+                    </tr>
+                    <tr>
+                      <td>CLI git</td>
+                      <td>100% feature parity; user’s git config/hooks</td>
+                      <td>Parsing porcelain; process overhead; version skew</td>
+                      <td class="good">Low–Med</td>
+                      <td class="mid">OK</td>
+                      <td class="good">High (if careful)</td>
+                      <td class="mid">Spawns cost</td>
+                      <td class="good">Low</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="decision">
+                <h4>
+                  Decision: Hybrid — gitoxide for status/diff/blame; CLI for
+                  complex write ops
+                </h4>
+                <dl>
+                  <dt>Why</dt>
+                  <dd>
+                    Best UX for interactive stage/diff while respecting hooks
+                    and full git behavior for commit/rebase/push. Matches how
+                    many modern tools evolve.
+                  </dd>
+                  <dt>Pros</dt>
+                  <dd>Speed where it matters; correctness where it matters.</dd>
+                  <dt>Cons</dt>
+                  <dd>Two paths to test.</dd>
+                  <dt>Migration</dt>
+                  <dd>
+                    Abstract behind <code>GitService</code> trait; migrate ops
+                    to gitoxide as it matures.
+                  </dd>
+                </dl>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="git-features">Feature Design</h3>
+              <ul>
+                <li>
+                  <strong>Diff:</strong> buffer-level and working tree; inline
+                  and side-by-side; word diff.
+                </li>
+                <li>
+                  <strong>Interactive stage:</strong> hunk/line stage/unstage
+                  via index edits.
+                </li>
+                <li>
+                  <strong>Merge/conflict:</strong> 3-way conflict buffers;
+                  CodeLens accept ours/theirs.
+                </li>
+                <li>
+                  <strong>Blame:</strong> annotated gutter; virtual text
+                  author/time; click → history.
+                </li>
+                <li>
+                  <strong>History:</strong> graph log view; file history; bisect
+                  integration later.
+                </li>
+                <li>
+                  <strong>Cherry-pick / rebase:</strong> CLI-driven with UI
+                  progress and conflict routing.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="remote">Remote Development</h2>
+
+            <article>
+              <h3 id="remote-model">Model (VS Code–like)</h3>
+              <p>
+                UI always runs locally. A <strong>remote agent</strong> runs
+                where the code lives (SSH host, WSL, Docker/Dev Container). Core
+                may run local (thin client mode) or co-located with agent for
+                latency (optional advanced mode). Default:
+                <strong>local core + remote agent</strong> for simpler crash
+                domains; evaluate co-location if latency demands.
+              </p>
+
+              <div class="decision">
+                <h4>
+                  Decision: Local UI + local core orchestrator + remote agent
+                  for FS/PTY/LSP/Git tools
+                </h4>
+                <dl>
+                  <dt>Why</dt>
+                  <dd>
+                    Matches VS Code remote architecture familiarity; keeps GPU
+                    UI local; minimizes remote GPU needs.
+                  </dd>
+                  <dt>Tradeoff</dt>
+                  <dd>
+                    Edit latency is local; file IO is remote. Buffer text is
+                    cached locally with version vectors.
+                  </dd>
+                  <dt>Alternative</dt>
+                  <dd>
+                    Full remote core (lower consistency risk, higher reconnect
+                    complexity). Deferred to post-MVP if needed.
+                  </dd>
+                </dl>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="remote-transports">Transports</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Scenario</th>
+                      <th>Transport</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Windows → WSL</td>
+                      <td>
+                        localhost socket / AF_UNIX via Windows / named pipe
+                        bridge
+                      </td>
+                      <td>Auto-detect distro; install agent into WSL</td>
+                    </tr>
+                    <tr>
+                      <td>Windows → Docker</td>
+                      <td>Docker exec + port/socket mount</td>
+                      <td>Dev Containers metadata</td>
+                    </tr>
+                    <tr>
+                      <td>Windows/macOS/Linux → SSH</td>
+                      <td>SSH multiplexed channel or reverse tunnel</td>
+                      <td>ControlMaster-like reuse</td>
+                    </tr>
+                    <tr>
+                      <td>Dev Containers</td>
+                      <td>Build/start container → attach agent</td>
+                      <td><code>devcontainer.json</code> support</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="remote-protocol">Remote Protocol</h3>
+              <p>Same NRPC schema as local IPC, with extensions:</p>
+              <ul>
+                <li>
+                  <code>fs.*</code> — open, read, write, rename, watch, stat,
+                  copy (chunked).
+                </li>
+                <li><code>pty.*</code> — open, input, resize, signals.</li>
+                <li>
+                  <code>lsp.*</code> / <code>dap.*</code> — process control;
+                  stdio framed.
+                </li>
+                <li><code>git.*</code> — ops against remote repo.</li>
+                <li>
+                  <code>task.*</code> — run builds/tests on remote when
+                  requested.
+                </li>
+                <li>
+                  <code>agent.health</code> — heartbeat, capabilities, version.
+                </li>
+              </ul>
+              <pre><code class="language-text">Local UI/Core                         Remote Agent
+    │                                      │
+    │  HELLO(version, auth, caps)          │
+    │─────────────────────────────────────►│
+    │  HELLO_ACK(session, caps)            │
+    │◄─────────────────────────────────────│
+    │  FS_WATCH(root)                      │
+    │─────────────────────────────────────►│
+    │  FS_EVENT(...)                       │
+    │◄─────────────────────────────────────│
+    │  PTY_OPEN / LSP_START / ...          │
+    │◄────────── streams ─────────────────►│</code></pre>
+            </article>
+
+            <article>
+              <h3 id="remote-resilience">Isolation, Reconnect, Offline</h3>
+              <ul>
+                <li>
+                  <strong>Process isolation:</strong> agent is separate binary;
+                  compromised plugin on remote does not auto-own local machine
+                  (still treat remote code as trusted-as-workspace).
+                </li>
+                <li>
+                  <strong>Reconnect:</strong> session tokens; resume FS watches;
+                  reattach PTY if OS allows, else restore with message; LSP
+                  restart with document sync from local buffer cache.
+                </li>
+                <li>
+                  <strong>Offline behavior:</strong> local buffer edits
+                  continue; queue writes; mark workspace offline; conflict
+                  detection on reconnect (mtime/hash).
+                </li>
+                <li>
+                  <strong>Failure recovery:</strong> exponential backoff;
+                  user-visible connection strip; “Reopen in local” escape.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="security">Security</h2>
+
+            <article>
+              <h3 id="security-model">Threat Model (Summary)</h3>
+              <ul>
+                <li>Malicious plugins from marketplace.</li>
+                <li>
+                  Malicious workspace files (scripts, tasks, LSP configs).
+                </li>
+                <li>Remote host compromise.</li>
+                <li>Supply chain attacks on updates.</li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="trust-secrets">Workspace Trust, Secrets, Signing</h3>
+              <ul>
+                <li>
+                  <strong>Workspace trust:</strong> untrusted workspaces disable
+                  tasks, plugins auto-run, and agent tools until trusted.
+                </li>
+                <li>
+                  <strong>Secrets:</strong> OS keychain (Windows Credential
+                  Manager, macOS Keychain, libsecret/Secret Service); never
+                  plain-text tokens in config.
+                </li>
+                <li>
+                  <strong>Credential storage:</strong> git credentials via OS /
+                  gh / git-credential helpers, not reinvented.
+                </li>
+                <li>
+                  <strong>Marketplace verification:</strong> package signatures
+                  (ed25519), publisher verification, SBOM, malware scanning in
+                  registry pipeline.
+                </li>
+                <li>
+                  <strong>Auto-update signing:</strong> minisign/cosign-style
+                  signatures on release artifacts; update client verifies before
+                  apply.
+                </li>
+              </ul>
+              <div class="callout warning">
+                <div class="callout-title">Warning</div>
+                <p>
+                  Compatibility with Neovim plugins increases risk: many expect
+                  shell and unrestricted FS. Default sandbox will break some
+                  plugins — document clearly; offer “legacy unrestricted”
+                  profile for power users with explicit warning.
+                </p>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="performance">Performance Engineering</h2>
+
+            <article>
+              <h3 id="perf-targets">Targets &amp; Budgets</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Area</th>
+                      <th>Budget</th>
+                      <th>Strategy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Cold start (UI shell)</td>
+                      <td>&lt; 100–400 ms</td>
+                      <td>
+                        Lazy load plugins; compact binary; avoid huge static
+                        init
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Warm start</td>
+                      <td>&lt; 50–150 ms</td>
+                      <td>
+                        Session cache; pre-open socket to core if persistent
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Memory idle</td>
+                      <td>&lt; 80–120 MB</td>
+                      <td>
+                        No Chromium; process split; arena allocators for frames
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Rendering</td>
+                      <td>60–120 FPS</td>
+                      <td>Damage tracking; atlas; no full redraw</td>
+                    </tr>
+                    <tr>
+                      <td>Large file (1 GB)</td>
+                      <td>Interactive scroll</td>
+                      <td>Rope + partial load + no full highlight</td>
+                    </tr>
+                    <tr>
+                      <td>Large repo</td>
+                      <td>Status &lt; 200 ms cached</td>
+                      <td>gitoxide; watchman-like; ignore heavy dirs</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="benchmarking">Benchmark, Profiling, Telemetry</h3>
+              <ul>
+                <li>
+                  <strong>Criterion</strong> benches for buffer ops, search,
+                  highlight.
+                </li>
+                <li>
+                  <strong>Startup bench</strong> in CI on reference hardware
+                  matrix.
+                </li>
+                <li>
+                  <strong>Profiling:</strong> Tracy / puffin for frames;
+                  <code>perf</code>/Instruments/Windows WPA guides in docs.
+                </li>
+                <li>
+                  <strong>Telemetry:</strong> opt-in, sampled, privacy-reviewed
+                  events only; no code content by default.
+                </li>
+                <li>
+                  <strong>Crash reports:</strong> opt-in minidumps with
+                  symbolication server.
+                </li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="build">Build System, CI/CD, Releases</h2>
+
+            <article>
+              <h3 id="build-pipeline">Build &amp; Release Pipeline</h3>
+              <ul>
+                <li>
+                  Cargo workspace; <code>cargo xtask</code> for orchestration
+                  (package, schema gen, grammar build).
+                </li>
+                <li>
+                  CI matrix: Windows x64, macOS x64, macOS arm64, Linux x64
+                  (Ubuntu), optional Linux arm64.
+                </li>
+                <li>
+                  Checks: fmt, clippy -D warnings, tests, benches (non-failing
+                  thresholds), plugin compat suite.
+                </li>
+                <li>
+                  <strong>Nightly builds:</strong> every main commit →
+                  artifacts; 7-day retention.
+                </li>
+                <li>
+                  <strong>Stable builds:</strong> tagged semver; signed;
+                  changelog generated from conventional commits.
+                </li>
+                <li>
+                  <strong>Auto-update:</strong> sparkle/winapp / custom static
+                  JSON feed; delta updates later.
+                </li>
+                <li>
+                  <strong>Versioning:</strong> semver for product; protocol
+                  version separate; plugin API semver separate.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="packaging">Packaging Targets</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Platform</th>
+                      <th>Artifacts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Windows</td>
+                      <td>
+                        <code>.exe</code> portable, <code>.msi</code>, winget
+                        manifest
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>macOS</td>
+                      <td>
+                        <code>.dmg</code>, Homebrew cask, notarized app bundle
+                        (universal binary preferred)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Linux</td>
+                      <td>
+                        AppImage, <code>.deb</code>, <code>.rpm</code>, PKGBUILD
+                        for pacman, optional Flatpak
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="testing">Testing Strategy</h2>
+            <p>
+              Testing is a product requirement, not an afterthought. Gates are
+              defined in <a href="#adr-0018">ADR-0018</a>. No merge to
+              <code>main</code> with red required checks.
+            </p>
+
+            <article>
+              <h3 id="test-layers">Test Layers (Pyramid)</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Layer</th>
+                      <th>What</th>
+                      <th>Tools</th>
+                      <th>CI gate</th>
+                      <th>Owner crate examples</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Unit</strong></td>
+                      <td>
+                        Pure logic: rope ops, keymap resolve, NRPC codec,
+                        settings schema
+                      </td>
+                      <td><code>cargo test</code>, proptest</td>
+                      <td>Required</td>
+                      <td>buffer, ipc, config</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Integration</strong></td>
+                      <td>
+                        Core + one host over real NRPC; file open; LSP mock
+                      </td>
+                      <td>subprocess harness, tempfile</td>
+                      <td>Required</td>
+                      <td>core, lang-host</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Snapshot</strong></td>
+                      <td>UI layout trees, theme tokens, statusline strings</td>
+                      <td>insta</td>
+                      <td>Required (review on change)</td>
+                      <td>ui</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Golden</strong></td>
+                      <td>
+                        Known buffer→highlight, VT emulator frames, search
+                        results
+                      </td>
+                      <td>checked-in fixtures</td>
+                      <td>Required</td>
+                      <td>syntax, term, search</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Fuzz</strong></td>
+                      <td>Edit sequences, RPC framing, regex inputs</td>
+                      <td>cargo-fuzz / libFuzzer</td>
+                      <td>Nightly + pre-release</td>
+                      <td>buffer, ipc</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Benchmark</strong></td>
+                      <td>Startup, large file scroll, rope ops, search</td>
+                      <td>criterion, custom harness</td>
+                      <td>Budget regression = fail or waiver ADR</td>
+                      <td>benches/</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Compatibility</strong></td>
+                      <td>Top Lua plugins smoke under compat layer</td>
+                      <td>dedicated job + matrix</td>
+                      <td>Required for compat changes</td>
+                      <td>compat-vim</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Cross-platform</strong></td>
+                      <td>Win/macOS/Linux matrix</td>
+                      <td>CI runners</td>
+                      <td>Required on release branches</td>
+                      <td>all</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Stress</strong></td>
+                      <td>Multi-cursor storms, 1GB file, 10k diagnostics</td>
+                      <td>custom</td>
+                      <td>Nightly</td>
+                      <td>core, ui</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Regression corpus</strong></td>
+                      <td>Every production bug gets a fixture</td>
+                      <td>corpus repo / tests/regressions</td>
+                      <td>Required once filed</td>
+                      <td>varies</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="test-policy">Policy</h3>
+              <ul>
+                <li>
+                  New public/Friend API → unit + at least one integration test
+                  in the same PR.
+                </li>
+                <li>
+                  Render/VT changes → golden or snapshot update with human
+                  review.
+                </li>
+                <li>
+                  Perf-sensitive PR → attach criterion delta or justify “no
+                  impact.”
+                </li>
+                <li>Fuzz crashes → minimize, fixture, fix before closing.</li>
+                <li>Flaky tests → quarantine max 7 days then fix or delete.</li>
+              </ul>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="mvp">MVP Definition — Daily Driver</h2>
+
+            <article>
+              <h3 id="mvp-include">Included in MVP</h3>
+              <p>
+                The MVP must be a <strong>real daily-driver</strong> for a
+                polyglot systems/web developer who today uses Neovim + a few
+                LSPs + terminal + git CLI.
+              </p>
+              <ul>
+                <li>
+                  Native GPU UI shell with dockable explorer, terminal,
+                  problems, command palette.
+                </li>
+                <li>
+                  Fast text editing with modal (Vim-style) keybindings
+                  implemented natively.
+                </li>
+                <li>
+                  Rope buffers, multi-cursor, undo tree, search/replace,
+                  splits/tabs.
+                </li>
+                <li>
+                  Tree-sitter highlighting for top languages (Rust, TS/JS,
+                  Python, Go, Lua, JSON, TOML, Markdown).
+                </li>
+                <li>
+                  Lua config: <code>init.lua</code>, options, keymaps, autocmds.
+                </li>
+                <li>
+                  Plugin host: Lua plugins + install from git; hot reload basic.
+                </li>
+                <li>
+                  Compat L1: substantial <code>vim.api</code>,
+                  <code>vim.keymap</code>, <code>vim.opt</code>,
+                  <code>vim.notify</code>, <code>vim.schedule</code>, basics of
+                  <code>vim.fn</code>.
+                </li>
+                <li>
+                  LSP: completion, hover, goto, references, rename, diagnostics,
+                  format.
+                </li>
+                <li>Integrated terminal (local PTY/ConPTY).</li>
+                <li>
+                  Git: status, diff, stage hunks, commit, push/pull via hybrid
+                  backend.
+                </li>
+                <li>
+                  Workspace session restore + crash recovery for unsaved
+                  buffers.
+                </li>
+                <li>
+                  SSH remote: open folder, edit, terminal, LSP on remote
+                  (basic).
+                </li>
+                <li>Installers for Win/macOS/Linux primary formats.</li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="mvp-exclude">Intentionally Excluded from MVP</h3>
+              <ul>
+                <li>WASM plugins.</li>
+                <li>Full DAP debugger UI (stubs OK).</li>
+                <li>Dev Containers / Docker remote (post-MVP quickly).</li>
+                <li>100% Neovim plugin compatibility.</li>
+                <li>Vimscript.</li>
+                <li>Collaborative multiplayer editing.</li>
+                <li>Built-in automated merge conflict resolution.</li>
+                <li>Mobile/web IDE.</li>
+                <li>
+                  Full marketplace signing PKI (can ship unsigned + hash only
+                  initially with warnings).
+                </li>
+                <li>
+                  Pixel-perfect VS Code theme importer (basic importer later).
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="after-mvp">Immediately After MVP</h3>
+              <ol>
+                <li>WSL + Dev Containers remote.</li>
+                <li>DAP debugger.</li>
+                <li>Compat L2 expansion driven by plugin telemetry.</li>
+                <li>Performance pass to hit year-3 budgets.</li>
+              </ol>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="roadmap">Implementation Roadmap</h2>
+
+            <div class="callout note">
+              <div class="callout-title">Note on estimates</div>
+              <p>
+                Durations assume a focused core team of ~4–8 senior engineers.
+                Calendar time stretches with smaller teams. Phases can partially
+                overlap after Phase 1 foundations land.
+              </p>
+            </div>
+
+
+            <article>
+              <h3 id="phase-0">
+                Phase 0 — Foundations &amp; Architecture Hardening
+              </h3>
+              <div class="card-grid">
+                <div class="card">
+                  <h5>Duration</h5>
+                  <p>6–8 weeks</p>
+                </div>
+                <div class="card">
+                  <h5>Dependencies</h5>
+                  <p>None (start)</p>
+                </div>
+                <div class="card">
+                  <h5>Team focus</h5>
+                  <p>Platform, buffer, IPC</p>
+                </div>
+              </div>
+              <h4>Goals</h4>
+              <ul>
+                <li>Monorepo, CI matrix, coding standards, ADR process.</li>
+                <li>NRPC prototype; multi-process hello world.</li>
+                <li>Buffer rope + undo + property tests.</li>
+                <li>winit+wgpu window with text prototype.</li>
+              </ul>
+              <h4>Deliverables</h4>
+              <ul>
+                <li>Workspace builds on Win/macOS/Linux.</li>
+                <li>Documented xtask; schema generation pipeline.</li>
+                <li>
+                  <a href="#adr-0003">ADR-0003</a> UI,
+                  <a href="#adr-0005">ADR-0005</a> buffer,
+                  <a href="#adr-0002">ADR-0002</a> IPC accepted.
+                </li>
+              </ul>
+              <h4>Risks</h4>
+              <ul>
+                <li>Underestimating text rendering complexity.</li>
+                <li>IPC bikeshedding delaying vertical slice.</li>
+              </ul>
+              <h4>Milestones &amp; Success Criteria</h4>
+              <ul>
+                <li>M0.1: empty window 120 FPS clear.</li>
+                <li>M0.2: type into rope buffer, see glyphs.</li>
+                <li>M0.3: UI process ↔ core process edit roundtrip.</li>
+              </ul>
+              <h4>Technical Debt / Refactor Plan</h4>
+              <p>
+                Expect render prototype rewrite once; keep buffer API stable. No
+                plugins yet to avoid premature API freeze.
+              </p>
+              <h4>Future Expansion</h4>
+              <p>Persistent core daemon mode experiments.</p>
+            </article>
+
+
+            <article>
+              <h3 id="phase-1">
+                Phase 1 — Editable Vertical Slice (Pre-Alpha)
+              </h3>
+              <div class="card-grid">
+                <div class="card">
+                  <h5>Duration</h5>
+                  <p>3–4 months</p>
+                </div>
+                <div class="card">
+                  <h5>Dependencies</h5>
+                  <p>Phase 0</p>
+                </div>
+              </div>
+              <h4>Goals</h4>
+              <ul>
+                <li>Modal editing core (normal/insert/visual essentials).</li>
+                <li>Files open/save; explorer; tabs/splits basic.</li>
+                <li>Tree-sitter highlight for Rust + Lua.</li>
+                <li>Lua <code>init.lua</code> options/keymaps.</li>
+                <li>Integrated terminal MVP.</li>
+              </ul>
+              <h4>Deliverables</h4>
+              <ul>
+                <li>Daily usable for editing this repo.</li>
+                <li>Session restore v0; autosave.</li>
+              </ul>
+              <h4>Risks</h4>
+              <ul>
+                <li>Keymap engine complexity (Vim parity rabbit hole).</li>
+                <li>Scope creep into full Vim emulation.</li>
+              </ul>
+              <h4>Success Criteria</h4>
+              <ul>
+                <li>
+                  Core team uses NVide for at least 50% of coding time for 2
+                  weeks.
+                </li>
+                <li>Cold start &lt; 500 ms on reference laptop.</li>
+              </ul>
+              <h4>Tech Debt</h4>
+              <p>
+                Mark incomplete motions; track in issue tracker; avoid fake
+                parity.
+              </p>
+            </article>
+
+
+            <article>
+              <h3 id="phase-2">Phase 2 — IDE Features &amp; LSP (Alpha)</h3>
+              <div class="card-grid">
+                <div class="card">
+                  <h5>Duration</h5>
+                  <p>3–4 months</p>
+                </div>
+                <div class="card">
+                  <h5>Dependencies</h5>
+                  <p>Phase 1</p>
+                </div>
+              </div>
+              <h4>Goals</h4>
+              <ul>
+                <li>Lang host + LSP feature set for MVP.</li>
+                <li>Problems panel; go-to; completion UI.</li>
+                <li>Git status/diff/commit.</li>
+                <li>Search project-wide.</li>
+                <li>Command palette completeness.</li>
+              </ul>
+              <h4>Success Criteria</h4>
+              <ul>
+                <li>
+                  Rust and TypeScript projects fully navigable with
+                  rust-analyzer / tsserver.
+                </li>
+                <li>No data loss in crash restore tests.</li>
+              </ul>
+              <h4>Risks</h4>
+              <ul>
+                <li>LSP edge cases; multi-server conflicts.</li>
+                <li>Git UX rabbit holes.</li>
+              </ul>
+            </article>
+
+
+            <article>
+              <h3 id="phase-3">Phase 3 — Plugins &amp; Compat L1 (Beta)</h3>
+              <div class="card-grid">
+                <div class="card">
+                  <h5>Duration</h5>
+                  <p>3–5 months</p>
+                </div>
+                <div class="card">
+                  <h5>Dependencies</h5>
+                  <p>Phase 2</p>
+                </div>
+              </div>
+              <h4>Goals</h4>
+              <ul>
+                <li>Plugin host process; permissions v1.</li>
+                <li>Git install of Lua plugins; lockfile.</li>
+                <li>Compat L1 complete enough for 5–10 popular plugins.</li>
+                <li>Hot reload Lua config.</li>
+              </ul>
+              <h4>Success Criteria</h4>
+              <ul>
+                <li>Compatibility suite green for declared plugin set.</li>
+                <li>Plugin crash does not kill core/UI.</li>
+              </ul>
+              <h4>Risks</h4>
+              <ul>
+                <li>Users expect full Neovim; communication risk.</li>
+                <li>Sandbox breaks plugins — need escape hatches.</li>
+              </ul>
+              <h4>Tech Debt</h4>
+              <p>
+                Compat shims may be messy; isolate in
+                <code>nvide-compat-vim</code> only.
+              </p>
+            </article>
+
+
+            <article>
+              <h3 id="phase-4">Phase 4 — Remote Development (Beta 2)</h3>
+              <div class="card-grid">
+                <div class="card">
+                  <h5>Duration</h5>
+                  <p>3–4 months</p>
+                </div>
+                <div class="card">
+                  <h5>Dependencies</h5>
+                  <p>Phase 2 (can parallel Phase 3 partially)</p>
+                </div>
+              </div>
+              <h4>Goals</h4>
+              <ul>
+                <li>SSH remote agent: FS, terminal, LSP.</li>
+                <li>Reconnect + offline edit queue.</li>
+              </ul>
+              <h4>Success Criteria</h4>
+              <ul>
+                <li>
+                  Develop over SSH with latency acceptable on same-region host.
+                </li>
+                <li>SSH remote used weekly by team for real work.</li>
+              </ul>
+              <h4>Risks</h4>
+              <ul>
+                <li>Remote correctness and security.</li>
+              </ul>
+            </article>
+
+
+            <article>
+              <h3 id="phase-5">Phase 5 — MVP Hardening &amp; Release</h3>
+              <div class="card-grid">
+                <div class="card">
+                  <h5>Duration</h5>
+                  <p>2–3 months</p>
+                </div>
+                <div class="card">
+                  <h5>Dependencies</h5>
+                  <p>Phases 1–4</p>
+                </div>
+              </div>
+              <h4>Goals</h4>
+              <ul>
+                <li>Packaging: msi/dmg/deb/rpm/AppImage/winget/brew.</li>
+                <li>Auto-update signed pipeline.</li>
+                <li>Perf budgets enforced; memory audit.</li>
+                <li>Docs, tutorial, migration from Neovim guide.</li>
+                <li>Public MVP launch.</li>
+              </ul>
+              <h4>Success Criteria</h4>
+              <ul>
+                <li>All MVP inclusion checklist complete.</li>
+                <li>Crash rate targets met on dogfood fleet.</li>
+                <li>
+                  External users can install and configure via Lua without
+                  building from source.
+                </li>
+              </ul>
+              <h4>Estimated total to MVP</h4>
+              <p>
+                <strong>~14–20 months</strong> for a strong team;
+                parallelization of remote/plugins can compress toward ~12 months
+                with higher headcount.
+              </p>
+            </article>
+
+
+            <article>
+              <h3 id="phase-6">Phase 6+ — Post-MVP Expansion (Years 2–3)</h3>
+              <ul>
+                <li>WSL, Docker, Dev Containers parity.</li>
+                <li>DAP debugger.</li>
+                <li>WASM plugins.</li>
+                <li>Compat L2 and 70%+ popular plugin matrix.</li>
+                <li>Multi-window polish, a11y certification efforts.</li>
+                <li>Enterprise: policy, private registry, airgap.</li>
+                <li>
+                  Collaborative editing research (CRDT) — only if product
+                  demands.
+                </li>
+              </ul>
+              <h4>Later expansion</h4>
+              <ul>
+                <li>Protocol major v2 if needed; dual-stack.</li>
+                <li>UI toolkit evolution without core rewrite.</li>
+                <li>Potential buffer CRDT for collab.</li>
+                <li>Continuous security/supply-chain hardening.</li>
+                <li>
+                  Language/runtime updates; never depend on abandoned nightlies.
+                </li>
+              </ul>
+            </article>
+
+            <article>
+              <h3 id="roadmap-risks">Cross-Cutting Roadmap Risks</h3>
+              <p>
+                Full living register:
+                <a href="#risk-register">Risk Register</a>. Table below is a
+                short execution-focused subset.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Risk</th>
+                      <th>Impact</th>
+                      <th>Mitigation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Vim motion parity abyss</td>
+                      <td class="bad">Infinite delay</td>
+                      <td>Define motion tiers; ship; iterate from dogfood</td>
+                    </tr>
+                    <tr>
+                      <td>Neovim compat expectations</td>
+                      <td class="bad">Reputation</td>
+                      <td>Honest matrix; native plugins; marketing clarity</td>
+                    </tr>
+                    <tr>
+                      <td>Text rendering quality</td>
+                      <td class="mid">User rejection</td>
+                      <td>Reuse shaping engines; hire expertise early</td>
+                    </tr>
+                    <tr>
+                      <td>Remote FS consistency</td>
+                      <td class="bad">Data loss</td>
+                      <td>WAL, version vectors, tests</td>
+                    </tr>
+                    <tr>
+                      <td>Team understaffed</td>
+                      <td class="mid">Slip</td>
+                      <td>Cut debugger/WASM first; protect editor core</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+
+          <section>
+            <h2 id="adr-index">ADR Index (Pointer)</h2>
+            <div class="callout note">
+              <div class="callout-title">Note</div>
+              <p>
+                The canonical ADR catalog is at the <strong>front</strong> of
+                this document:
+                <a href="#adr-catalog">Architecture Decision Record Catalog</a>
+                (<a href="#adr-0001">ADR-0001</a> …
+                <a href="#adr-0019">ADR-0019</a>+). This section exists so older
+                links to <code>#adr-index</code> still resolve.
+              </p>
+            </div>
+            <p>Quick jumps:</p>
+            <ul>
+              <li><a href="#adr-0001">ADR-0001</a> Overall architecture</li>
+              <li><a href="#adr-0002">ADR-0002</a> IPC</li>
+              <li><a href="#adr-0003">ADR-0003</a> Rendering</li>
+              <li><a href="#adr-0004">ADR-0004</a> Plugin isolation</li>
+              <li><a href="#adr-catalog">Full catalog table</a></li>
+            </ul>
+          </section>
+
+
+          <section>
+            <h2 id="glossary">Glossary</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Term</th>
+                    <th>Definition</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>NRPC</td>
+                    <td>NVide remote/local RPC protocol</td>
+                  </tr>
+                  <tr>
+                    <td>Core</td>
+                    <td>Process owning editor state</td>
+                  </tr>
+                  <tr>
+                    <td>Extmark</td>
+                    <td>Anchored buffer decoration/range</td>
+                  </tr>
+                  <tr>
+                    <td>Compat layer</td>
+                    <td><code>vim.*</code> façade over NVide APIs</td>
+                  </tr>
+                  <tr>
+                    <td>Agent</td>
+                    <td>
+                      Remote-side binary (<code>nvide-agent</code>) for
+                      FS/PTY/LSP/Git
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>VFS</td>
+                    <td>Virtual file system abstraction (local/remote)</td>
+                  </tr>
+                  <tr>
+                    <td>Tier / Level</td>
+                    <td>Compatibility or API stability classification</td>
+                  </tr>
+                  <tr>
+                    <td>ADR</td>
+                    <td>
+                      Architecture Decision Record (<code>ADR-NNNN</code>)
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Public / Friend / Internal / Private</td>
+                    <td>Crate visibility tiers</td>
+                  </tr>
+                  <tr>
+                    <td>MSRV</td>
+                    <td>Minimum Supported Rust Version</td>
+                  </tr>
+                  <tr>
+                    <td>Milestone</td>
+                    <td>
+                      Product evolution stage (MVP, 1.0, 2.0, Enterprise, Cloud)
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Golden test</td>
+                    <td>
+                      Fixture-compared expected output (highlight, VT, search)
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+
+          <section>
+            <h2 id="appendix">Appendix</h2>
+
+            <article>
+              <h3 id="appendix-keymaps">Native Keymap Engine Notes</h3>
+              <p>Implement a pure Rust modal engine with:</p>
+              <ul>
+                <li>Operator-pending mode, counts, registers.</li>
+                <li>Which-key style discovery via command metadata.</li>
+                <li>
+                  Lua remaps that never re-enter infinite recursion (Neovim-like
+                  <code>remap</code>/<code>noremap</code>).
+                </li>
+                <li>Timeoutlen / ttimeoutlen equivalents.</li>
+              </ul>
+              <p>Do not shell out to Vim for motions.</p>
+            </article>
+
+            <article>
+              <h3 id="appendix-settings-schema">Settings Schema Example</h3>
+              <pre><code class="language-json">{
+  "$schema": "https://nvide.dev/schemas/settings-v1.json",
+  "editor.fontFamily": "JetBrains Mono",
+  "editor.fontSize": 14,
+  "editor.tabSize": 4,
+  "editor.lineNumbers": "relative",
+  "remote.ssh.keepAliveSeconds": 30,
+  "plugins.sandbox.defaultProfile": "strict"
+}</code></pre>
+            </article>
+
+            <article>
+              <h3 id="appendix-compat-matrix">
+                Sample Compatibility Matrix (Illustrative)
+              </h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Plugin class</th>
+                      <th>MVP</th>
+                      <th>Year 2</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Colorschemes (Lua)</td>
+                      <td class="good">High</td>
+                      <td class="good">High</td>
+                      <td>Map to theme tokens</td>
+                    </tr>
+                    <tr>
+                      <td>Statusline</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">High</td>
+                      <td>Prefer native</td>
+                    </tr>
+                    <tr>
+                      <td>Fuzzy finders</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">High</td>
+                      <td>UI select bridge</td>
+                    </tr>
+                    <tr>
+                      <td>LSP helpers</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">High</td>
+                      <td>Client shape differs</td>
+                    </tr>
+                    <tr>
+                      <td>Tree-sitter plugins</td>
+                      <td class="mid">Medium</td>
+                      <td class="good">High</td>
+                      <td>No raw C pointers</td>
+                    </tr>
+                    <tr>
+                      <td>Plugins with FFI/Vimscript</td>
+                      <td class="bad">None</td>
+                      <td class="bad">Low</td>
+                      <td>Unsupported</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article>
+              <h3 id="appendix-process-supervisor">Supervisor Pseudocode</h3>
+              <pre><code class="language-rust">loop {
+    for child in children.iter_mut() {
+        if child.heartbeat_expired() {
+            child.kill_and_restart_with_backoff();
+            metrics.inc("process.restart", child.name);
+        }
+    }
+    if core_dead() {
+        flush_wal_hint();
+        restart_core_and_rebind_ui();
+    }
+    sleep(Duration::from_millis(200));
+}</code></pre>
+            </article>
+          </section>
+
+          <footer class="doc-footer">
+            <p>
+              <strong>NVide Architecture Document</strong> · Architecture v0.2.0
+              · ADR catalog 2026.07 · 2026-07-23
+            </p>
+            <p>
+              This document is the architecture baseline for the NVide native
+              Rust IDE. Implementation must follow stated ADRs or file
+              superseding ADRs.
+            </p>
+            <p>
+              © NVide Project. Generated as a self-contained engineering design
+              deliverable.
+            </p>
+          </footer>
+        </main>
+      </div>
+    </div>
+
+    <button
+      type="button"
+      id="back-to-top"
+      aria-label="Back to top"
+      title="Back to top"
+    >
+      ↑
+    </button>
+    <script src="assets/document.js" defer></script>
+  </body>
+</html>

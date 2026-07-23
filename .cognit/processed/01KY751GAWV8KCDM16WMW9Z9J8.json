@@ -1,0 +1,22 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY74HTRTZNHDAEWNHXTH4DH7",
+  "actor_name": "grok+TH4DH7",
+  "actor_type": "worker",
+  "id": "01KY751GAWV8KCDM16WMW9Z9J8",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "write",
+    "tool_input": {},
+    "tool_response": "{\"type\":\"SearchReplace\",\"EditsApplied\":{\"old_string\":\"\",\"new_string\":\"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"UTF-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\\n<meta name=\\\"description\\\" content=\\\"NVide — Native Rust IDE Architecture Document. Enterprise-scale design for a next-generation developer environment.\\\">\\n<meta name=\\\"author\\\" content=\\\"Chief Software Architect, NVide Project\\\">\\n<title>NVide Architecture Document — Native Rust IDE</title>\\n<style>\\n/* ============================================================\\n   NVide Architecture Document — Design System\\n   Self-contained. No external dependencies.\\n   ============================================================ */\\n\\n:root {\\n  --font-sans: \\\"Segoe UI\\\", system-ui, -…",
+    "text": "tool write returned",
+    "path": null,
+    "command": null
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7GDG3FS0210VZ470RHA789",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "read_file",
+    "tool_input": {
+      "target_file": "/home/permees/Projects/github.com/phucle297/nvide/docs/assets/document.js",
+      "offset": 90,
+      "limit": 50
+    },
+    "tool_response": {
+      "type": "ReadFile",
+      "FileContent": {
+        "content": "90→    const a = document.createElement(\"a\");\n    a.href = \"#\" + h.id;\n    a.textContent = h.textContent.trim();\n    li.appendChild(a);\n    tocEl.appendChild(li);\n    tocItems.push({ id: h.id, el: h, link: a });\n  });\n\n  /* ---------- Active section highlight ----------\n         * Anchor line = CSS scroll-padding-top (same as browser hash/TOC scroll).\n100→         * Active = section with largest intersection ratio inside the reading band\n         * [anchorLine, viewportBottom). Fixes: click §2 but spy still on §1; and\n         * §1 only 10% visible while §2 fills 90% → highlight §2.\n         */\n        let highlightLockId = null;\n        let highlightLockTimer = null;\n        let lastActiveId = null;\n\n        /** Same offset the browser uses when scrolling to #hash / TOC links. */\n        …",
+        "content_concise": "90→    const a = document.createElement(\"a\");\n    a.href = \"#\" + h.id;\n    a.textContent = h.textContent.trim();\n    li.appendChild(a);\n    tocEl.appendChild(li);\n    tocItems.push({ id: h.id, el: h, link: a });\n  });\n\n  /* ---------- Active section highlight ----------\n         * Anchor line = CSS scroll-padding-top (same as browser hash/TOC scroll).\n100→         * Active = section with largest intersection ratio inside the reading band\n         * [anchorLine, viewportBottom). Fixes: click §2 but spy still on §1; and\n         * §1 only 10% visible while §2 fills 90% → highlight §2.\n         */\n        let highlightLockId = null;\n        let highlightLockTimer = null;\n        let lastActiveId = null;\n\n        /** Same offset the browser uses when scrolling to #hash / TOC links. */\n        …",
+        "absolute_path": "/home/permees/Projects/github.com/phucle297/nvide/docs/assets/document.js",
+        "offset": 90,
+        "limit": 50,
+        "raw_output": "    const a = document.createElement(\"a\");\n    a.href = \"#\" + h.id;\n    a.textContent = h.textContent.trim();\n    li.appendChild(a);\n    tocEl.appendChild(li);\n    tocItems.push({ id: h.id, el: h, link: a });\n  });\n\n  /* ---------- Active section highlight ----------\n         * Anchor line = CSS scroll-padding-top (same as browser hash/TOC scroll).\n         * Active = section with largest intersection ratio inside the reading band\n         * [anchorLine, viewportBottom). Fixes: click §2 but spy still on §1; and\n         * §1 only 10% visible while §2 fills 90% → highlight §2.\n         */\n        let highlightLockId = null;\n        let highlightLockTimer = null;\n        let lastActiveId = null;\n\n        /** Same offset the browser uses when scrolling to #hash / TOC links. */\n        functio…",
+        "total_lines": 496
+      }
+    },
+    "text": "tool read_file → /home/permees/Projects/github.com/phucle297/nvide/docs/assets/document.js",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/assets/document.js",
+    "command": null
+  }
+}

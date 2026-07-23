@@ -1,0 +1,43 @@
+actors:
+  defaults:
+    human: 0.9
+    system: 1
+    worker: 0.6
+  known: []
+cleanup:
+  artifact_max_age_days: 30
+  inbox_tmp_max_age_days: 30
+  max_db_size_mb: 1024
+  unreferenced_action: archive
+gravity:
+  freshness_half_life_days: 14
+  weights:
+    confidence: 0.2
+    evidence: 0.3
+    freshness: 0.1
+    reproducibility: 0.3
+    trust: 0.1
+inbox:
+  atomic_write_required: true
+  auto_drain: true
+  debounce_ms: 200
+  max_pending: 1000
+  realtime: true
+  semantic_llm: false
+  soft_confidence_threshold: 0.7
+  watch: true
+llm:
+  api_key_env: LITELLM_MASTER_KEY
+  base_url: http://localhost:4000
+  commands: {}
+  format: openai
+  model_aliases: {}
+  timeout_ms: 300000
+project:
+  name: nvide
+redaction:
+  enabled: true
+  patterns: []
+session:
+  fork_on_resume: true
+  snapshot_every_n_events: 100

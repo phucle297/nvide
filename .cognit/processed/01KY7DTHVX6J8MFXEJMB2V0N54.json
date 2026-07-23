@@ -1,0 +1,25 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7DTHVX6J8MFXEJMB2V0N54",
+  "source": {
+    "tool": "grok",
+    "command": "PreToolUse"
+  },
+  "payload": {
+    "phase": "pre",
+    "host": "grok",
+    "tool": "read_file",
+    "tool_input": {
+      "target_file": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+      "offset": 2480,
+      "limit": 120
+    },
+    "text": "agent intends to read_file /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}

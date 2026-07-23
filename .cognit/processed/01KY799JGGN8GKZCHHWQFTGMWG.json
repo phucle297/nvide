@@ -1,0 +1,48 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY799JGGN8GKZCHHWQFTGMWG",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "search_replace",
+    "tool_input": {
+      "file_path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+      "old_string": "  /* ---------- Smooth scroll for TOC ---------- */\n  tocEl.addEventListener(\"click\", function (e) {\n    const a = e.target.closest(\"a\");\n    if (!a) return;\n    // allow default smooth via css; close mobile sidebar\n    if (sidebar) sidebar.classList.remove(\"open\");\n  });\n\n  /* ---------- Active section highlight ---------- */\n  function updateActiveSection() {\n    const scrollY = window.scrollY + 100;\n    let current = tocItems[0];\n    for (let i = 0; i < tocItems.length; i++) {\n      const top = tocItems[i].el.getBoundingClientRect().top + window.scrollY;\n      if (top <= scrollY) current = tocItems[i];\n    }\n    tocItems.forEach(function (item) {\n      item.link.classList.toggle(\"active\", item === current);\n    });\n  }\n  window.addEventListener(\"scroll\", updateActiveSection, { passive: …",
+      "new_string": "  /* ---------- Active section highlight ---------- */\n  /* Match sticky header + html scroll-padding-top so spy aligns with click targets */\n  let highlightLockId = null;\n  let highlightLockTimer = null;\n\n  function headerScrollOffset() {\n    const pad = getComputedStyle(document.documentElement).scrollPaddingTop;\n    const parsed = parseFloat(pad);\n    if (!isNaN(parsed) && parsed > 0) return parsed;\n    const header = document.querySelector(\".doc-header\");\n    return (header ? header.offsetHeight : 52) + 16;\n  }\n\n  function setActiveTocItem(current) {\n    if (!current) return;\n    tocItems.forEach(function (item) {\n      item.link.classList.toggle(\"active\", item === current);\n    });\n    /* Keep active entry visible inside sticky sidebar */\n    const link = current.link;\n    if (!sideba…"
+    },
+    "tool_response": {
+      "type": "SearchReplace",
+      "EditsApplied": {
+        "old_string": "  /* ---------- Smooth scroll for TOC ---------- */\n  tocEl.addEventListener(\"click\", function (e) {\n    const a = e.target.closest(\"a\");\n    if (!a) return;\n    // allow default smooth via css; close mobile sidebar\n    if (sidebar) sidebar.classList.remove(\"open\");\n  });\n\n  /* ---------- Active section highlight ---------- */\n  function updateActiveSection() {\n    const scrollY = window.scrollY + 100;\n    let current = tocItems[0];\n    for (let i = 0; i < tocItems.length; i++) {\n      const top = tocItems[i].el.getBoundingClientRect().top + window.scrollY;\n      if (top <= scrollY) current = tocItems[i];\n    }\n    tocItems.forEach(function (item) {\n      item.link.classList.toggle(\"active\", item === current);\n    });\n  }\n  window.addEventListener(\"scroll\", updateActiveSection, { passive: …",
+        "new_string": "  /* ---------- Active section highlight ---------- */\n  /* Match sticky header + html scroll-padding-top so spy aligns with click targets */\n  let highlightLockId = null;\n  let highlightLockTimer = null;\n\n  function headerScrollOffset() {\n    const pad = getComputedStyle(document.documentElement).scrollPaddingTop;\n    const parsed = parseFloat(pad);\n    if (!isNaN(parsed) && parsed > 0) return parsed;\n    const header = document.querySelector(\".doc-header\");\n    return (header ? header.offsetHeight : 52) + 16;\n  }\n\n  function setActiveTocItem(current) {\n    if (!current) return;\n    tocItems.forEach(function (item) {\n      item.link.classList.toggle(\"active\", item === current);\n    });\n    /* Keep active entry visible inside sticky sidebar */\n    const link = current.link;\n    if (!sideba…",
+        "tool_output_for_prompt": "The file /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html has been updated successfully.",
+        "tool_output_for_prompt_concise": "The file /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html has been updated.",
+        "absolute_path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+        "edits": {
+          "details": [
+            {
+              "old_string": "  /* ---------- Smooth scroll for TOC ---------- */\n  tocEl.addEventListener(\"click\", function (e) {\n    const a = e.target.closest(\"a\");\n    if (!a) return;\n    // allow default smooth via css; close mobile sidebar\n    if (sidebar) sidebar.classList.remove(\"open\");\n  });\n\n  /* ---------- Active section highlight ---------- */\n  function updateActiveSection() {\n    const scrollY = window.scrollY + 100;\n    let current = tocItems[0];\n    for (let i = 0; i < tocItems.length; i++) {\n      const top = tocItems[i].el.getBoundingClientRect().top + window.scrollY;\n      if (top <= scrollY) current = tocItems[i];\n    }\n    tocItems.forEach(function (item) {\n      item.link.classList.toggle(\"active\", item === current);\n    });\n  }\n  window.addEventListener(\"scroll\", updateActiveSection, { passive: …",
+              "old_line": 2833,
+              "new_string": "  /* ---------- Active section highlight ---------- */\n  /* Match sticky header + html scroll-padding-top so spy aligns with click targets */\n  let highlightLockId = null;\n  let highlightLockTimer = null;\n\n  function headerScrollOffset() {\n    const pad = getComputedStyle(document.documentElement).scrollPaddingTop;\n    const parsed = parseFloat(pad);\n    if (!isNaN(parsed) && parsed > 0) return parsed;\n    const header = document.querySelector(\".doc-header\");\n    return (header ? header.offsetHeight : 52) + 16;\n  }\n\n  function setActiveTocItem(current) {\n    if (!current) return;\n    tocItems.forEach(function (item) {\n      item.link.classList.toggle(\"active\", item === current);\n    });\n    /* Keep active entry visible inside sticky sidebar */\n    const link = current.link;\n    if (!sideba…",
+              "new_line": 2833,
+              "context_before": "    tocItems.push({ id: h.id, el: h, link: a });\n  });\n\n",
+              "context_after": "\n  /* ---------- Back to top ---------- */\n  function updateBackToTop() {\n",
+              "line_prefix": ""
+            }
+          ]
+        }
+      }
+    },
+    "text": "tool search_replace → /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "version": "1.3.0",
+  "type": "raw_tool_signal",
+  "session_id": "01KY751GYYFSRC7E5R3EH6RVH8",
+  "actor_name": "grok+H6RVH8",
+  "actor_type": "worker",
+  "id": "01KY7DZDTWPP7SH8GA72PE8S2X",
+  "source": {
+    "tool": "grok",
+    "command": "PostToolUse"
+  },
+  "payload": {
+    "phase": "post",
+    "host": "grok",
+    "tool": "grep",
+    "tool_input": {
+      "pattern": "Tier A|60 MB|60&nbsp;MB|&lt; 60",
+      "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html"
+    },
+    "tool_response": {
+      "type": "GrepSearch",
+      "stdout": [
+        60,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        114,
+        101,
+        115,
+        117,
+        108,
+        116,
+        32,
+        119,
+        111,
+        114,
+        107,
+        115,
+        112,
+        97,
+        99,
+        101,
+        95,
+        112,
+        97,
+        116,
+        104,
+        61,
+        34,
+        47,
+        104,
+        111,
+        109,
+        101,
+        47,
+        "…"
+      ],
+      "stderr": [],
+      "exit_code": 0,
+      "match_count": 5,
+      "file_matches": [
+        {
+          "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+          "matches": [
+            {
+              "line_number": 1748,
+              "content": "            <td>Share of popular pure-Lua plugins that run using only <a href=\"#compat-levels\">L1</a> APIs (not L2–L4). Measured by CI plugin suite, not marketing “Tier A”.</td>"
+            },
+            {
+              "line_number": 1772,
+              "content": "      <p><strong>P1 (process isolation)</strong> deliberately spends memory for crash domain separation. A multi-host default profile will <em>not</em> compete with a single-process editor’s idle RSS. We refuse contradictory “all hosts always-on + Electron-beating 60&nbsp;MB total” targets. Stretch numbers apply only to the <strong>minimal profile</strong>, and even then remain secondary to isolation and correctness.</p>"
+            },
+            {
+              "line_number": 2692,
+              "content": "      <p><strong>MVP estimate:</strong> ~35–45% of popular pure-Lua plugins that need only <strong>L1</strong> APIs; expands as L2 lands. There is no separate “Tier A” label — use <a href=\"#compat-levels\">L0–L4</a> only.</p>"
+            },
+            {
+              "line_number": 3184,
+              "content": "      <li><strong>Policy:</strong> measure <em>profiles</em> (minimal vs default). Never claim “six always-on hosts + &lt;60&nbsp;MB total.”</li>"
+            },
+            {
+              "line_number": 3610,
+              "content": "        <tr><td>L0–L4</td><td>Neovim API compatibility levels (only official scale; no “Tier A”)</td></tr>"
+            }
+          ]
+        }
+      ]
+    },
+    "text": "tool grep → /home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "path": "/home/permees/Projects/github.com/phucle297/nvide/docs/architecture.html",
+    "command": null
+  }
+}
