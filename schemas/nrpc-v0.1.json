@@ -1,0 +1,73 @@
+{
+  "$id": "https://nvide.dev/schemas/nrpc-v0.1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Framed multiplexed IPC (u32 LE len + stream id + flags + payload). Payload starts with msg_type u16 LE then message-specific fields. Cap'n Proto may replace the body encoder later without changing the frame header.",
+  "messages": {
+    "ApplyEdit": {
+      "fields": [
+        "buffer_id:u64",
+        "pos:u64",
+        "delete_len:u64",
+        "insert_text:string"
+      ],
+      "type": 3
+    },
+    "EditResult": {
+      "fields": [
+        "buffer_id:u64",
+        "version:u64",
+        "text:string"
+      ],
+      "type": 4
+    },
+    "Error": {
+      "fields": [
+        "code:u32",
+        "message:string"
+      ],
+      "type": 5
+    },
+    "Hello": {
+      "fields": [
+        "major:u16",
+        "minor:u16",
+        "client_name:string"
+      ],
+      "type": 1
+    },
+    "HelloAck": {
+      "fields": [
+        "major:u16",
+        "minor:u16",
+        "server_name:string"
+      ],
+      "type": 2
+    }
+  },
+  "nrpc": {
+    "flags": {
+      "CANCEL": 16,
+      "COMPRESSED": 32,
+      "ERR": 8,
+      "PRIORITY": 64,
+      "PUSH": 4,
+      "REQ": 1,
+      "RESP": 2
+    },
+    "frame": {
+      "flags": "u16 LE — REQ|RESP|PUSH|ERR|CANCEL|COMPRESSED|PRIORITY",
+      "len": "u32 LE — length of (stream_id + flags + payload)",
+      "payload": "bytes",
+      "stream_id": "u32 LE"
+    },
+    "streams": {
+      "CONTROL": 0,
+      "EDIT": 1
+    },
+    "version": {
+      "major": 0,
+      "minor": 1
+    }
+  },
+  "title": "NVide NRPC Phase 0"
+}

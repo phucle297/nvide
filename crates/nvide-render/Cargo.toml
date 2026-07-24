@@ -1,0 +1,10 @@
+[package]
+name = "nvide-render"
+description = "GPU text/layout primitives for NVide (Phase 0 prototype)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nvide-buffer = { workspace = true }

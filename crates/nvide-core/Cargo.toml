@@ -1,0 +1,18 @@
+[package]
+name = "nvide-core"
+description = "NVide core process: buffer ownership and NRPC server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "nvide-core"
+path = "src/main.rs"
+
+[dependencies]
+nvide-buffer = { workspace = true }
+nvide-ipc = { workspace = true }
+nvide-rpc-schema = { workspace = true }
+nvide-platform = { workspace = true }
+clap = { workspace = true }

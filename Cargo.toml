@@ -1,0 +1,56 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nvide-buffer",
+    "crates/nvide-ipc",
+    "crates/nvide-rpc-schema",
+    "crates/nvide-platform",
+    "crates/nvide-core",
+    "crates/nvide-render",
+    "crates/nvide",
+    "xtask",
+]
+default-members = [
+    "crates/nvide-buffer",
+    "crates/nvide-ipc",
+    "crates/nvide-rpc-schema",
+    "crates/nvide-platform",
+    "crates/nvide-core",
+    "crates/nvide-render",
+    "crates/nvide",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/phucle297/nvide"
+rust-version = "1.82"
+
+[workspace.dependencies]
+# Internal
+nvide-buffer = { path = "crates/nvide-buffer" }
+nvide-ipc = { path = "crates/nvide-ipc" }
+nvide-rpc-schema = { path = "crates/nvide-rpc-schema" }
+nvide-platform = { path = "crates/nvide-platform" }
+nvide-core = { path = "crates/nvide-core" }
+nvide-render = { path = "crates/nvide-render" }
+
+# External
+ropey = "1.6"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+proptest = "1"
+clap = { version = "4", features = ["derive"] }
+winit = "0.30"
+wgpu = "24"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+
+[profile.dev]
+debug = true
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,6 @@
+# Target: 1.85+ stable (architecture baseline / CI).
+# MSRV: 1.82 — see docs/coding-standards.md and workspace rust-version.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

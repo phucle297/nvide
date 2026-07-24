@@ -1,0 +1,29 @@
+[package]
+name = "nvide"
+description = "NVide UI binary (thin winit + wgpu shell)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+default-run = "nvide"
+
+[[bin]]
+name = "nvide"
+path = "src/main.rs"
+
+[[bin]]
+name = "nvide-nrpc-client"
+path = "src/bin/nrpc_client.rs"
+
+[dependencies]
+nvide-buffer = { workspace = true }
+nvide-core = { workspace = true }
+nvide-ipc = { workspace = true }
+nvide-rpc-schema = { workspace = true }
+nvide-platform = { workspace = true }
+nvide-render = { workspace = true }
+clap = { workspace = true }
+winit = { workspace = true }
+wgpu = { workspace = true }
+pollster = { workspace = true }
+bytemuck = { workspace = true }

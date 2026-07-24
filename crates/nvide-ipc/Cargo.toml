@@ -1,0 +1,13 @@
+[package]
+name = "nvide-ipc"
+description = "NRPC framed multiplexed IPC codec and transport helpers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nvide-rpc-schema = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

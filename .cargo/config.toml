@@ -1,0 +1,3 @@
+# Developer aliases (documented in docs/coding-standards.md).
+[alias]
+xtask = ["run", "-p", "xtask", "--"]

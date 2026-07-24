@@ -1,0 +1,11 @@
+[package]
+name = "nvide-rpc-schema"
+description = "NRPC message schema types and schema metadata for NVide"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

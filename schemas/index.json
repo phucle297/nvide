@@ -1,0 +1,14 @@
+{
+  "generated_by": "cargo xtask schema-gen",
+  "schemas": [
+    {
+      "id": "nrpc-v0.1",
+      "kind": "nrpc",
+      "path": "nrpc-v0.1.json",
+      "version": {
+        "major": 0,
+        "minor": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# Clippy configuration for the NVide workspace.
+# CI runs: cargo clippy --workspace --all-targets -- -D warnings
+msrv = "1.82"
+avoid-breaking-exported-api = false

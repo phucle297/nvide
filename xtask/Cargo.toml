@@ -1,0 +1,17 @@
+[package]
+name = "xtask"
+description = "NVide developer orchestration (schema gen, etc.)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+nvide-rpc-schema = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }

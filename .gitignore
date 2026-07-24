@@ -1,0 +1,23 @@
+# Rust
+/target/
+**/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Cognit local memory
+.cognit/
+
+# Generated (kept under schemas/ when committed by xtask; ignore local junk)
+*.tmp
+*.log
+
+# Env / secrets
+.env
+.env.*
