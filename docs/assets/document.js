@@ -238,6 +238,7 @@
       lockHighlight(id, 1000);
     }
     if (sidebar) sidebar.classList.remove("open");
+    if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "false");
   });
 
   window.addEventListener("scroll", updateActiveSection, { passive: true });
@@ -291,14 +292,21 @@
 
 
   if (sidebarToggle) {
+    sidebarToggle.setAttribute("aria-controls", sidebar.id);
+    sidebarToggle.setAttribute("aria-expanded", "false");
     sidebarToggle.addEventListener("click", function () {
       sidebar.classList.toggle("open");
+      sidebarToggle.setAttribute(
+        "aria-expanded",
+        String(sidebar.classList.contains("open")),
+      );
     });
     document.addEventListener("click", function (e) {
       if (!sidebar.classList.contains("open")) return;
       if (sidebar.contains(e.target) || sidebarToggle.contains(e.target))
         return;
       sidebar.classList.remove("open");
+      sidebarToggle.setAttribute("aria-expanded", "false");
     });
   }
 
@@ -339,17 +347,17 @@
   });
   loadDetailsState();
 
-  document
-    .getElementById("btn-expand")
-    .addEventListener("click", function () {
+  const expandButton = document.getElementById("btn-expand");
+  const collapseButton = document.getElementById("btn-collapse");
+  if (expandButton)
+    expandButton.addEventListener("click", function () {
       allDetails().forEach(function (d) {
         d.open = true;
       });
       saveDetailsState();
     });
-  document
-    .getElementById("btn-collapse")
-    .addEventListener("click", function () {
+  if (collapseButton)
+    collapseButton.addEventListener("click", function () {
       allDetails().forEach(function (d) {
         d.open = false;
       });

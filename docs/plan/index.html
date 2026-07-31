@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="NVide implementation plan from Phase 0 through separately gated post-MVP milestones." />
+    <title>NVide Implementation Plan</title>
+    <link rel="stylesheet" href="../assets/document.css" />
+  </head>
+  <body>
+    <header class="doc-header">
+      <button type="button" id="sidebar-toggle" class="icon-btn" aria-label="Toggle table of contents" aria-controls="sidebar" aria-expanded="false">☰</button>
+      <a class="brand" href="#top"><span class="brand-mark">N</span><span>NVide Plan</span></a>
+      <span class="meta">Architecture v0.2.0 · Ready for review</span>
+      <div class="spacer"></div>
+      <div class="toolbar">
+        <input type="search" id="search-input" placeholder="Search document…" aria-label="Search within document" autocomplete="off" />
+        <span id="search-count" aria-live="polite"></span>
+        <button type="button" id="btn-expand" title="Expand all sections">Expand</button>
+        <button type="button" id="btn-collapse" title="Collapse all sections">Collapse</button>
+        <button type="button" id="theme-toggle" title="Toggle theme" aria-label="Toggle light/dark theme">Theme</button>
+      </div>
+    </header>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar" aria-label="Table of contents">
+        <h2>Contents</h2>
+        <nav id="toc-nav"><ul id="toc"></ul></nav>
+      </aside>
+      <div class="content-wrap">
+        <main id="top">
+          <div class="cover">
+            <h1>NVide Implementation Plan</h1>
+            <p class="subtitle">Architecture-bound execution plan from Phase 0 foundations through separately approved post-MVP milestones.</p>
+            <dl class="cover-grid">
+              <div><dt>Status</dt><dd>READY FOR REVIEW</dd></div>
+              <div><dt>Last reviewed</dt><dd>2026-07-31</dd></div>
+              <div><dt>Architecture</dt><dd>v0.2.0</dd></div>
+              <div><dt>Current phase</dt><dd>Phase 0</dd></div>
+              <div><dt>Current target</dt><dd>MVP</dd></div>
+              <div><dt>Canonical source</dt><dd><code>docs/plan/README.md</code></dd></div>
+            </dl>
+          </div>
+
+          <div class="callout important">
+            <div class="callout-title">Canonical plan and review state</div>
+            <p>The Markdown plan is canonical. This HTML may shorten prose but must preserve every normative gate, stable ID, interface, metric, exclusion, and ADR mapping. No durable external review artifact exists, so this revision is ready for review rather than approved.</p>
+          </div>
+
+          <section>
+            <h2 id="governance">Plan governance</h2>
+            <ul>
+              <li>Architecture v0.2.0 and Accepted ADR-0001…ADR-0019 remain authoritative.</li>
+              <li>A requirement absent from Architecture becomes a prerequisite decision or artifact; implementation does not guess it.</li>
+              <li>The phase lead owns prerequisites unless a narrower owner is named. ADRs use the Architecture acceptance rule. Other artifacts require the phase lead and one independent reviewer; security artifacts also require a security reviewer.</li>
+              <li>Each phase creates the named evidence ledger during implementation. Every entry records its stable requirement/acceptance ID, artifact path, command, environment/profile, result, date, and reviewer. A claim without a runnable command or inspectable artifact is not exit evidence.</li>
+              <li>IDs are immutable after review: prerequisites use <code>Pn.n</code>, requirements <code>Pn-Rn</code>, acceptance <code>Pn-An</code>, evidence <code>Pn-En</code>, and blockers <code>Pn-Bn</code>; 6A–6D use their milestone prefix. CI must reject duplicate/unknown IDs and required IDs without ledger references.</li>
+              <li>A phase starts only after dependencies and all prerequisites are approved. Phase 4 may overlap Phase 3 only after Phase 2 exits.</li>
+              <li>No <code>AGREE</code> verdict is valid without two inspectable, independent review records covering both formats, Phase 0–5, and the Phase 6+ umbrella.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 id="overall-plan">Overall phase plan</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Phase</th><th>Milestone</th><th>Dependency</th><th>Scope / exit</th><th>ADRs</th></tr></thead>
+                <tbody>
+                  <tr><td>0 — Foundations</td><td>MVP</td><td>None</td><td>Canonical gates, benchmark profile, exact workspace, buffer/undo, NRPC, supervisor, shaped-text edit path; four-target CI and failure evidence</td><td>0001–0003, 0005, 0010–0013, 0015, 0017–0019</td></tr>
+                  <tr><td>1 — Editable slice</td><td>MVP</td><td>Phase 0</td><td>Local editor, approved modal subset, multi-cursor/search, shell, Rust/Lua syntax, Lua config subset, isolated terminal, restore/autosave; runnable safety suite, dogfood, startup gate</td><td>0001–0003, 0005–0006, 0010, 0012–0014, 0016–0019; 0015 only if prerequisite ADR declares stability</td></tr>
+                  <tr><td>2 — IDE &amp; LSP</td><td>MVP</td><td>Phase 1</td><td><code>nvide-lang</code>, seven LSP features, UI, hybrid Git, search, grammars, WAL; pinned navigation and no acknowledged-edit loss</td><td>0001–0002, 0008, 0010–0013, 0015–0019</td></tr>
+                  <tr><td>3 — Plugins &amp; Compat</td><td>MVP</td><td>Phase 2</td><td>Minimal API Stability Tier S3 (Rust plugin SDK) v1, Lua host, locked plugin contracts, permissions, frozen suite; all smoke tests green and Tier A ≥35%</td><td>0001–0002, 0004, 0006–0007, 0011, 0013, 0015–0019</td></tr>
+                  <tr><td>4 — Remote</td><td>MVP</td><td>Phase 2; may overlap 3</td><td>Locked SSH FS/PTY/LSP interface, version-vector cache, reconnect, ordered offline writes; safety/security matrix and mean reconnect &lt;5 s</td><td>0001–0002, 0009, 0011–0019</td></tr>
+                  <tr><td>5 — Hardening</td><td>MVP</td><td>Successful exit of Phases 0–4</td><td>Required packages, signed releases/updates, measurement gates, memory audit, docs, external acceptance; all blockers and Phase 0–4 revalidation green</td><td>0010, 0013, 0015–0019</td></tr>
+                  <tr><td>6A — Stability</td><td>1.0</td><td>Public MVP</td><td>S1 Lua/API Stability Tier S3 stability, migration, budgets/docs, marketplace v0; marketplace ADR required</td><td>0004, 0007, 0010, 0015–0016, 0018–0019 + marketplace ADR</td></tr>
+                  <tr><td>6B — Platform</td><td>2.0</td><td>1.0</td><td>Remote parity, DAP, Compat L2, experimental WASM, multi-window/a11y, feasibility-confirmed post-MVP budgets; DAP/WASM ADRs required</td><td>0004, 0007, 0009–0010, 0015–0019 + DAP/WASM ADRs</td></tr>
+                  <tr><td>6C — Enterprise</td><td>Enterprise</td><td>2.0</td><td>Private registry, SSO, airgap, policy, audit, support; enterprise security/policy ADR and threat model required</td><td>0016, 0018–0019 + enterprise ADR</td></tr>
+                  <tr><td>6D — Cloud</td><td>Cloud</td><td>Enterprise</td><td>Hosted workspaces, settings sync, optional thin client, retained local UI; Cloud tenancy/security ADR required</td><td>0001–0002, 0009, 0015–0019 + Cloud ADR</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <h2 id="sequencing">Sequencing and scope</h2>
+            <ol>
+              <li>Protect Phase 0 buffer, rendering, IPC, supervisor, and cross-platform baselines before product features.</li>
+              <li>Do not scaffold later-phase crates or pull plugins, LSP, Git, terminal, remote, marketplace, DAP, or WASM into an earlier phase.</li>
+              <li>Phase 3 and Phase 4 may overlap only after Phase 2; Phase 5 requires successful exit of, then integrates and revalidates, Phases 0–4.</li>
+              <li>Apply ADR-0018's relevant unit, integration, snapshot/golden, fuzz, compatibility, performance, and cross-platform gates in every phase.</li>
+              <li>6A–6D are separate approvals. CRDT, NRPC v2, renderer replacement, and LuaJIT stay research-only until demand and an Accepted ADR authorize them.</li>
+            </ol>
+            <h3 id="mvp-scope">MVP boundary</h3>
+            <p><strong>Included:</strong> native UI; approved modal editing; rope, multi-cursor, undo, search, splits/tabs; selected Tree-sitter languages; Lua configuration; Lua plugin host and Compat L1; seven LSP features; local terminal; hybrid Git; recovery; basic SSH; required installers.</p>
+            <p><strong>Excluded:</strong> WASM, full DAP, WSL/Docker/Dev Containers, full Neovim compatibility, Vimscript, collaboration, automatic merge-conflict resolution, mobile/web, full marketplace PKI, delta updates, and pixel-perfect VS Code theme import.</p>
+          </section>
+
+          <section>
+            <h2 id="details">Detailed phase plans</h2>
+
+            <article>
+              <h3 id="phase-0">Phase 0 — Foundations &amp; Architecture Hardening</h3>
+              <div class="card-grid">
+                <div class="card"><h4>Milestone</h4><p>MVP · current phase</p></div>
+                <div class="card"><h4>Duration</h4><p>6–8 weeks</p></div>
+                <div class="card"><h4>Evidence</h4><p><code>docs/evidence/phase-0.md</code></p></div>
+                <div class="card"><h4>ADRs</h4><p>0001–0003, 0005, 0010–0013, 0015, 0017–0019</p></div>
+              </div>
+              <details open>
+                <summary>Phase 0 — gates, scope, and acceptance</summary>
+                <div class="details-body">
+                  <p><strong>Entry order:</strong> P0.1 and P0.2 block all workspace implementation; P0.3 blocks schema work.</p>
+                  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
+                    <tr><td>P0.1</td><td>Canonical ADR-0002/0003/0005 records, coding standards, and ADR workflow matching v0.2.0</td><td>Tech lead; ADR rule and independent coding-standard review</td></tr>
+                    <tr><td>P0.2</td><td>Benchmark/trace profile: hardware, OS/toolchain, release build, warmup, samples, tool, aggregation, pass rule. “120 FPS clear” is actually presented steady-state frames for an empty no-workspace/no-plugin window at fixed resolution/vsync. The scripted UI↔core edit correlates dispatch → core version → viewport receipt → first presented glyph.</td><td>Performance owner; phase lead + performance reviewer</td></tr>
+                    <tr><td>P0.3</td><td>Approved <code>xtask</code> command surface and generated-schema ownership/check policy</td><td>Build owner; phase lead + reviewer</td></tr>
+                  </tbody></table></div>
+                  <h4>Requirements</h4>
+                  <ul>
+                    <li>☐ <strong>P0-R1:</strong> Create exactly <code>nvide</code>, <code>nvide-core</code>, <code>nvide-buffer</code>, <code>nvide-platform</code>, <code>nvide-ipc</code>, <code>nvide-rpc-schema</code>, <code>nvide-render</code>, and <code>nvide-ui</code>; no later crate scaffolding.</li>
+                    <li>☐ <strong>P0-R2:</strong> Enforce ADR-0011 direction and stable/MSRV CI on Windows x64, macOS x64, macOS arm64, and Linux x64.</li>
+                    <li>☐ <strong>P0-R3:</strong> Reproducible clean-checkout <code>xtask</code> schema generation.</li>
+                    <li>☐ <strong>P0-R4:</strong> Rope edits, line index/conversions, UTF-8 boundaries, branching undo, property/fuzz coverage.</li>
+                    <li>☐ <strong>P0-R5:</strong> NRPC framing/multiplexing, Unix sockets/Windows named pipes, schemas, and ADR-0015 major/minor handshake.</li>
+                    <li>☐ <strong>P0-R6:</strong> Minimum UI/core supervision proving ADR-0017 heartbeat, detection, restart budget, restart/rebind, and degradation.</li>
+                    <li>☐ <strong>P0-R7:</strong> Shaped text and input → NRPC → core rope edit → viewport snapshot → visible glyph update under P0.2.</li>
+                  </ul>
+                  <h4>Ordered work and runnable acceptance</h4>
+                  <ol>
+                    <li><strong>P0-A1:</strong> Approve P0.1/P0.2; exact workspace and CI. Record clean build/test/dependency checks on all four targets.</li>
+                    <li><strong>P0-A2:</strong> Approve P0.3; deterministic schemas. Approved regeneration command exits zero and <code>git diff --exit-code</code> is clean.</li>
+                    <li><strong>P0-A3:</strong> Buffer tests cover edits, line endings, invalid UTF-8 boundaries, undo branches, and generated roundtrips.</li>
+                    <li><strong>P0-A4:</strong> NRPC/supervisor tests cover malformed/oversized/truncated frames, versions, cancellation, broken transport, heartbeat loss, restart exhaustion, and restart/rebind.</li>
+                    <li><strong>P0-A5:</strong> Under P0.2 record the defined 120 FPS workload, rope-sourced edit, and correlation trace through the first presented glyph.</li>
+                  </ol>
+                  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Evidence</th></tr></thead><tbody>
+                    <tr><td>P0-E1</td><td>Maps P0-R1/P0-R2/P0-A1 to four CI jobs and clean build/test/dependency commands.</td></tr>
+                    <tr><td>P0-E2</td><td>Maps P0-R3/P0-A2 to schema command, generated paths, tool versions, and clean diff.</td></tr>
+                    <tr><td>P0-E3</td><td>Maps P0-R4/P0-A3 to buffer unit/property/fuzz artifacts.</td></tr>
+                    <tr><td>P0-E4</td><td>Maps P0-R5/P0-A4 to framing/handshake/fuzz, malformed frames, mismatch, cancellation, IPC failure, subprocess roundtrip.</td></tr>
+                    <tr><td>P0-E5</td><td>Maps P0-R6/P0-A4 to forced failure, restart/rebind, budget exhaustion, degradation.</td></tr>
+                    <tr><td>P0-E6</td><td>Maps P0-R7/P0-A5 to P0.2, exact commands, raw frames, shaped-text capture, correlation trace, and first-presented-glyph artifact.</td></tr>
+                  </tbody></table></div>
+                  <p><strong>Out:</strong> full shell, modal editor, terminal, LSP, Git, plugins, remote, DAP, marketplace, production daemon, and later-phase crates. The render prototype may be replaced once; buffer API stays stable.</p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="phase-1">Phase 1 — Editable Vertical Slice (Pre-Alpha)</h3>
+              <div class="card-grid">
+                <div class="card"><h4>Milestone</h4><p>MVP</p></div>
+                <div class="card"><h4>Dependency</h4><p>All Phase 0 gates</p></div>
+                <div class="card"><h4>Evidence</h4><p><code>docs/evidence/phase-1.md</code></p></div>
+                <div class="card"><h4>ADRs</h4><p>0001–0003, 0005–0006, 0010, 0012–0014, 0016–0019; 0015 conditional</p></div>
+              </div>
+              <details open>
+                <summary>Phase 1 — gates, scope, and acceptance</summary>
+                <div class="details-body">
+                  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
+                    <tr><td>P1.1</td><td>Normal/insert/visual action-key matrix, included count/register behavior, explicit unsupported list</td><td>Editor owner; phase lead + reviewer</td></tr>
+                    <tr><td>P1.2</td><td>Autocmd events, ordering, nesting/reentrancy, cancellation, and per-handler/error behavior</td><td>Config owner; phase lead + reviewer</td></tr>
+                    <tr><td>P1.3</td><td>Dogfood/startup protocol: laptop, workload, cold definition, build, warmup, samples, aggregation, coding-time capture, pass rule</td><td>Performance owner; phase lead + reviewer</td></tr>
+                    <tr><td>P1.4</td><td>ADR resolving Phase 1 Lua config versus Phase 3 plugin host, pre-plugin load order, and any stable Lua/settings promise</td><td>Tech lead; ADR acceptance rule</td></tr>
+                  </tbody></table></div>
+                  <h4>Requirements</h4>
+                  <ul>
+                    <li>☐ <strong>P1-R1:</strong> Local file open/edit/save/close/reopen with correct dirty state, external-change detection, atomic save, and visible save failure.</li>
+                    <li>☐ <strong>P1-R2:</strong> Only P1.1 modal actions, selections, transactional multi-cursor, and buffer search/replace; one multi-cursor batch → one undo node.</li>
+                    <li>☐ <strong>P1-R3:</strong> Explorer, groups, tabs/splits, and viewport sufficient for this repository.</li>
+                    <li>☐ <strong>P1-R4:</strong> Incremental Rust/Lua syntax; stale async results discarded by buffer version.</li>
+                    <li>☐ <strong>P1-R5:</strong> P1.4 Lua 5.4 subset with typed options, keymaps, and only P1.2 autocmds.</li>
+                    <li>☐ <strong>P1-R6:</strong> Isolated terminal host with portable PTY/ConPTY and proven VT; crash cannot kill core/UI.</li>
+                    <li>☐ <strong>P1-R7:</strong> Restore buffers/cursors/layout; safe autosave; corrupt/stale recovery; no invented Untitled path.</li>
+                  </ul>
+                  <h4>Runnable acceptance</h4>
+                  <ol>
+                    <li><strong>P1-A1:</strong> Dirty transitions, permission/I/O save failure retaining dirty state, external mutation, and exactly one undo node per multi-cursor batch.</li>
+                    <li><strong>P1-A2:</strong> Repository walkthrough: explorer, split edit, save, close, and layout restore.</li>
+                    <li><strong>P1-A3:</strong> Rust/Lua goldens, stale parse discard, and invalid Lua/autocmd errors without crashing.</li>
+                    <li><strong>P1-A4:</strong> Cross-platform PTY/VT tests and forced host crash isolation with visible terminal loss.</li>
+                    <li><strong>P1-A5:</strong> Corrupt/stale recovery, pathless Untitled, ≥50% dogfood for two weeks, and cold start &lt;500 ms under P1.3.</li>
+                  </ol>
+                  <p><strong>P1-E1:</strong> The ledger maps P1-R1…P1-R7 and P1-A1…P1-A5 to commands/artifacts, unsupported list, dirty/save failures, one-batch→one-undo, stale syntax, PTY isolation, session recovery, and raw dogfood/startup samples.</p>
+                  <p><strong>Out:</strong> LSP/problems, Git, project search, plugin host/Compat, SSH, DAP, marketplace, full Vim parity, and other MVP grammars. Unsupported motions remain labeled unsupported in both documents, tests, and product messaging.</p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="phase-2">Phase 2 — IDE Features &amp; LSP (Alpha)</h3>
+              <div class="card-grid">
+                <div class="card"><h4>Milestone</h4><p>MVP</p></div>
+                <div class="card"><h4>Dependency</h4><p>Phase 1 metrics</p></div>
+                <div class="card"><h4>Evidence</h4><p><code>docs/evidence/phase-2.md</code></p></div>
+                <div class="card"><h4>ADRs</h4><p>0001–0002, 0008, 0010–0013, 0015–0019</p></div>
+              </div>
+              <details open>
+                <summary>Phase 2 — gates, scope, and acceptance</summary>
+                <div class="details-body">
+                  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
+                    <tr><td>P2.1</td><td>Executable Rust/TypeScript navigation fixtures, expected results, pinned rust-analyzer and TypeScript server versions</td><td>Language owner; phase lead + reviewer</td></tr>
+                    <tr><td>P2.2</td><td>Complete MVP command-palette command/provider inventory</td><td>UI owner; phase lead + reviewer</td></tr>
+                    <tr><td>P2.3</td><td>WAL acknowledgement/durability contract and UI/core/hosts crash matrix at before/after-ACK points</td><td>Core owner; ADR if architecture changes, otherwise phase lead + reviewer</td></tr>
+                  </tbody></table></div>
+                  <div class="callout security"><div class="callout-title">Locked trust rule</div><p>ADR-0016 allows gitoxide status/diff read-only in untrusted workspaces. Every Git CLI write and hook-capable operation stays blocked until trust.</p></div>
+                  <h4>Requirements</h4>
+                  <ul>
+                    <li>☐ <strong>P2-R1:</strong> <code>nvide-lang</code> lifecycle, cancellation, ADR-0017 restart budget, and full versioned resync.</li>
+                    <li>☐ <strong>P2-R2:</strong> Exactly seven LSP features: completion, hover, goto/definition, references, rename, diagnostics, format.</li>
+                    <li>☐ <strong>P2-R3:</strong> Current-version results in problems/navigation/gutter/extmarks/completion/P2.2 palette; reject stale/malformed results.</li>
+                    <li>☐ <strong>P2-R4:</strong> Hybrid Git with hunk/line stage/unstage under the trust rule, preserving config/hooks/credential helpers.</li>
+                    <li>☐ <strong>P2-R5:</strong> Ignore-aware streaming search resilient to unreadable paths and binary files.</li>
+                    <li>☐ <strong>P2-R6:</strong> TS/JS, Python, Go, JSON, TOML, Markdown grammars.</li>
+                    <li>☐ <strong>P2-R7:</strong> P2.3 WAL/recovery with mtime/hash conflicts and recovery report.</li>
+                  </ul>
+                  <h4>Ordered work packages</h4>
+                  <ol>
+                    <li><strong>P2-A1:</strong> Stabilize versioned buffer/extmark flow and the P2.3 fault harness.</li>
+                    <li><strong>P2-A2:</strong> Build <code>nvide-lang</code>, seven LSP features, UI consumers, restart/resync, and NRPC compatibility.</li>
+                    <li><strong>P2-A3:</strong> Add trust-aware hybrid Git and streaming project search.</li>
+                    <li><strong>P2-A4:</strong> Add six grammars and frozen P2.2 palette inventory.</li>
+                    <li><strong>P2-A5:</strong> Run pinned P2.1 navigation and forced-crash suites.</li>
+                  </ol>
+                  <h4>Exit evidence</h4>
+                  <ul>
+                    <li><strong>P2-E1:</strong> Maps P2-R1…P2-R3/P2-A1/P2-A2 to restart/resync/cancellation/mismatch/stale/malformed/multi-server evidence.</li>
+                    <li><strong>P2-E2:</strong> Maps P2-R2/P2-R3/P2-A5 to pinned Rust/TypeScript fixtures that are <strong>fully navigable</strong>.</li>
+                    <li><strong>P2-E3:</strong> Maps P2-R4/P2-A3 to trust, hunk/line stage/unstage, commit/push/pull, and error cases.</li>
+                    <li><strong>P2-E4:</strong> Maps P2-R5/P2-R6/P2-A3/P2-A4 to grammar and search fixtures.</li>
+                    <li><strong>P2-E5:</strong> Maps P2-R7/P2-A1/P2-A5 to every before/after-ACK kill, corrupt WAL, conflicts, recovery report, and proves <strong>crash restore loses no acknowledged edit</strong>.</li>
+                  </ul>
+                  <p><strong>Out:</strong> plugin host/Compat, remote, full DAP, task/test expansion, deep Git history/rebase UI, signature help, code actions, semantic tokens, inlay hints, workspace symbols, call hierarchy, and code lens unless approved separately.</p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="phase-3">Phase 3 — Plugins &amp; Compat L1 (Beta)</h3>
+              <div class="card-grid">
+                <div class="card"><h4>Milestone</h4><p>MVP</p></div>
+                <div class="card"><h4>Dependency</h4><p>Phase 2</p></div>
+                <div class="card"><h4>Evidence</h4><p><code>docs/evidence/phase-3.md</code></p></div>
+                <div class="card"><h4>ADRs</h4><p>0001–0002, 0004, 0006–0007, 0011, 0013, 0015–0019</p></div>
+              </div>
+              <details open>
+                <summary>Phase 3 — gates, contracts, and acceptance</summary>
+                <div class="details-body">
+                  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
+                    <tr><td>P3.1</td><td>Frozen 5–10 plugins, fixed commits/versions, smoke actions/results, Tier-A denominator/calculation</td><td>Compat owner; phase lead + two reviewers</td></tr>
+                    <tr><td>P3.2</td><td>Minimal API Stability Tier S3 (Rust plugin SDK) v1 contract and deprecation/version plan</td><td>Plugin owner; ADR acceptance if public architecture changes, plus API approval by tech lead + independent reviewer</td></tr>
+                    <tr><td>P3.3</td><td>Fine-grained UI/LSP contract: UI contribution is separate from editor-state reads; bounded LSP API; content needs explicit read grant; all capabilities scoped to workspace trust</td><td>Plugin/security owners; phase lead + independent security reviewer</td></tr>
+                  </tbody></table></div>
+                  <p>Phase 3 ships the minimum API Stability Tier S3 (Rust plugin SDK) v1; the compatibility suite remains Lua-focused and does not expand for SDK work.</p>
+                  <h4>Locked interface</h4>
+                  <ul>
+                    <li><strong>Manifest:</strong> identity, version, source, dependencies, permissions, activation.</li>
+                    <li><strong>Lockfile:</strong> commit/version/hash.</li>
+                    <li><strong>Lifecycle:</strong> discover → resolve → fetch/verify → load → activate → runtime → deactivate → quarantine.</li>
+                    <li><strong>Defaults:</strong> workspace-only read; prompt write/clipboard; deny net/shell. UI allow means declarative contribution, not editor-state read. LSP is a bounded API, not raw transport/server access. Neither permits arbitrary buffer/workspace/source reads without explicit content-read grant. Activation/grants require workspace trust; grants are revocable; legacy unrestricted is opt-in with warning.</li>
+                  </ul>
+                  <h4>Requirements</h4>
+                  <ul>
+                    <li>☐ <strong>P3-R1:</strong> Out-of-process Lua callbacks with restart budgets and quarantine.</li>
+                    <li>☐ <strong>P3-R2:</strong> Only the P3.2 minimal versioned API Stability Tier S3 SDK.</li>
+                    <li>☐ <strong>P3-R3:</strong> Manifest validation and P3.3 grant/revoke/workspace trust.</li>
+                    <li>☐ <strong>P3-R4:</strong> Deterministic Git/dependencies, hashes, lockfile, deactivate cleanup.</li>
+                    <li>☐ <strong>P3-R5:</strong> Minimum native Lua/Compat L1 surface demanded by P3.1: required buffer/window/extmark/autocmd/command APIs, <code>vim.keymap</code>, <code>vim.opt</code>, <code>vim.notify</code>, <code>vim.schedule</code>, and suite-demanded <code>vim.fn</code>.</li>
+                    <li>☐ <strong>P3-R6:</strong> Cleanup-aware reload without leaked/duplicate registrations.</li>
+                    <li>☐ <strong>P3-R7:</strong> Compatibility and unsupported-call report.</li>
+                  </ul>
+                  <h4>Order</h4>
+                  <ol>
+                    <li><strong>P3-A1:</strong> Freeze P3.1–P3.3 and locked contracts.</li>
+                    <li><strong>P3-A2:</strong> Lua host, callbacks, supervision, P3.3 permissions/trust, minimal Tier S3 SDK.</li>
+                    <li><strong>P3-A3:</strong> Git verify, lockfile, dependency order, lifecycle/quarantine.</li>
+                    <li><strong>P3-A4:</strong> Minimum native Lua and isolated Compat L1 calls demanded by P3.1.</li>
+                    <li><strong>P3-A5:</strong> Reload and compatibility/security/reproducibility/crash suites.</li>
+                  </ol>
+                  <p><strong>P3-E1:</strong> Maps P3-R5/P3-R7/P3-A4/P3-A5 to every frozen smoke action and measured Tier A ≥35%; above 45% still passes.</p>
+                  <p><strong>P3-E2:</strong> Maps P3-R1…P3-R4/P3-R6 and P3-A1…P3-A5 to manifest rejection, P3.3 least privilege, grant/revoke/defaults, trust denial, cycles, hashes, reinstall, leaks, crash/quarantine, and unsupported calls.</p>
+                  <p><strong>Out:</strong> registry/update channels, marketplace PKI, WASM, Compat L2+, Vimscript, raw libuv FFI, undocumented internals, 100% parity, unrestricted defaults.</p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="phase-4">Phase 4 — Remote Development (Beta 2)</h3>
+              <div class="card-grid">
+                <div class="card"><h4>Milestone</h4><p>MVP</p></div>
+                <div class="card"><h4>Dependency</h4><p>Phase 2; may overlap 3</p></div>
+                <div class="card"><h4>Evidence</h4><p><code>docs/evidence/phase-4.md</code></p></div>
+                <div class="card"><h4>ADRs</h4><p>0001–0002, 0009, 0011–0019</p></div>
+              </div>
+              <details open>
+                <summary>Phase 4 — gates, protocol, and acceptance</summary>
+                <div class="details-body">
+                  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
+                    <tr><td>P4.1</td><td>Client/agent OS-version compatibility and release matrix</td><td>Remote owner; phase lead + reviewer</td></tr>
+                    <tr><td>P4.2</td><td>ADR for SSH bootstrap/auth, install/update, token lifetime/rotation/revocation, agent integrity</td><td>Remote/security owners; ADR rule + security reviewer</td></tr>
+                    <tr><td>P4.3</td><td>Latency/network profile: hardware/OS, bandwidth/RTT/loss, workload, warmup, samples, aggregation, tool, pass rule</td><td>Performance owner; phase lead + independent performance reviewer</td></tr>
+                    <tr><td>P4.4</td><td>ADR for ACK/durability, per-path ordering, version-vector conflicts, idempotent replay</td><td>Core/remote owners; ADR rule</td></tr>
+                  </tbody></table></div>
+                  <h4>Locked interface</h4>
+                  <p><code>HELLO</code>/<code>HELLO_ACK</code>; <code>agent.health</code>, <code>fs.*</code>, <code>pty.*</code>, <code>lsp.*</code> only. No <code>dap.*</code>, <code>task.*</code>, or remote Git. Cache uses version vectors; offline writes are per-path ordered and idempotent; no silent overwrite, automatic merge, or hidden conflict.</p>
+                  <h4>Requirements</h4>
+                  <ul>
+                    <li>☐ <strong>P4-R1:</strong> Verified SSH agent and version/capability/session handshake.</li>
+                    <li>☐ <strong>P4-R2:</strong> Version-vector remote FS/watch/write under P4.4.</li>
+                    <li>☐ <strong>P4-R3:</strong> Agent-owned PTY/LSP with local control/render.</li>
+                    <li>☐ <strong>P4-R4:</strong> Watch/PTy/LSP recovery and mean reconnect &lt;5 s under P4.3.</li>
+                    <li>☐ <strong>P4-R5:</strong> Continue local editing offline with ordered/idempotent writes, visible degradation, and no silent overwrite/merge.</li>
+                    <li>☐ <strong>P4-R6:</strong> Trust/capabilities, OS-keychain secrets, no local shell/FS escape.</li>
+                  </ul>
+                  <h4>Order</h4>
+                  <ol>
+                    <li><strong>P4-A1:</strong> Approve P4.1–P4.4; bootstrap, handshake/session, trust.</li>
+                    <li><strong>P4-A2:</strong> FS/watch, version-vector cache, ACK, writes.</li>
+                    <li><strong>P4-A3:</strong> Agent-owned PTY/LSP.</li>
+                    <li><strong>P4-A4:</strong> Reconnect, watch resume, PTY loss/reattach, LSP resync.</li>
+                    <li><strong>P4-A5:</strong> Offline conflict/replay and P4.3 dogfood.</li>
+                  </ol>
+                  <p><strong>P4-E1:</strong> Maps P4-R1…P4-R5/P4-A1…P4-A5 to ACK disconnects, replay, mutation, watch/PTY/LSP recovery, reconnect, weekly use, and latency.</p>
+                  <p><strong>P4-E2:</strong> Maps P4-R1/P4-R6/P4-A1 to malicious agents, malformed frames, traversal, secrets, token/integrity failure, and local shell/FS escape attempts.</p>
+                  <p><strong>Out:</strong> WSL, Docker, Dev Containers, remote-core, <code>dap.*</code>, <code>task.*</code>, remote Git, collaboration, automatic merge, full remote parity.</p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="phase-5">Phase 5 — MVP Hardening &amp; Release</h3>
+              <div class="card-grid">
+                <div class="card"><h4>Milestone</h4><p>MVP release</p></div>
+                <div class="card"><h4>Dependency</h4><p>Successful exit of Phases 0–4, then release revalidation</p></div>
+                <div class="card"><h4>Evidence</h4><p><code>docs/evidence/phase-5.md</code></p></div>
+                <div class="card"><h4>ADRs</h4><p>0010, 0013, 0015–0019</p></div>
+              </div>
+              <details open>
+                <summary>Phase 5 — release prerequisites and blockers</summary>
+                <div class="details-body">
+                  <p><strong>P5.1 entry gate:</strong> approve hardware/OS, release build, cold/warm definitions, warmup, samples, aggregation, regressions, waivers, external-user rule, and immutable fixture manifests/hashes. The 1 GiB manifest fixes encoding, newline, line-length distribution/max, content mix, syntax mode; the repo manifest fixes files, commits, tracked/untracked/modified counts and cache state; the crash contract fixes the session formula/window. Owners: release/performance; approval: tech lead + performance reviewer, plus privacy/security for crash/external data.</p>
+                  <h4>Required packaging</h4>
+                  <div class="table-wrap"><table><thead><tr><th>Platform</th><th>Required</th></tr></thead><tbody>
+                    <tr><td>Windows</td><td>Portable <code>.exe</code>, <code>.msi</code>, winget</td></tr>
+                    <tr><td>macOS</td><td><code>.dmg</code>, Homebrew cask, notarized app bundle; universal preferred, not required</td></tr>
+                    <tr><td>Linux</td><td>AppImage, <code>.deb</code>, <code>.rpm</code>, PKGBUILD; Flatpak optional/non-blocking</td></tr>
+                  </tbody></table></div>
+                  <h4>Release blocker contracts</h4>
+                  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Blocker / workload end point</th></tr></thead><tbody>
+                    <tr><td>P5-B1</td><td>Cold &lt;400 ms: release process launch → first file-backed buffer editable and first viewport presented; declared cold caches.</td></tr>
+                    <tr><td>P5-B2</td><td>Warm &lt;150 ms: same end point under declared warm OS/session caches; no hidden pre-opened window.</td></tr>
+                    <tr><td>P5-B3</td><td>Idle RSS &lt;120 MB: all NVide-owned processes after P5.1 workspace quiescence; exclusions declared.</td></tr>
+                    <tr><td>P5-B4</td><td>60 FPS: actually presented frames under representative edit/scroll at fixed resolution/vsync; not P0 empty-window clear.</td></tr>
+                    <tr><td>P5-B5</td><td>1 GiB UTF-8 fixture &lt;2 s: open accepted → first viewport plus a scripted vertical scroll presents a new viewport; fixture cannot be malformed/trivial.</td></tr>
+                    <tr><td>P5-B6</td><td>Cached large repo &lt;200 ms: one prior completed status, no mutation; request → complete status model applied, not first partial row.</td></tr>
+                    <tr><td>P5-B7</td><td>Crash &lt;1%: every non-test launch has a session ID; unexpected NVide-process termination preventing/ending edit is numerator; all sessions in approved window are denominator.</td></tr>
+                    <tr><td>P5-B8</td><td>Every required Phase 0–4 evidence ID is rerun or freshness-validated on the release candidate.</td></tr>
+                    <tr><td>P5-B9</td><td>Inspectable per-process memory ownership/leak/growth audit with commands, workload, raw results, findings, disposition.</td></tr>
+                  </tbody></table></div>
+                  <h4>Requirements</h4>
+                  <ul>
+                    <li>☐ <strong>P5-R1:</strong> Map every MVP inclusion and Phase 0–4 ID to passing/fresh evidence.</li>
+                    <li>☐ <strong>P5-R2:</strong> Supervisor recovery and opt-in P5-B7 crash metrics.</li>
+                    <li>☐ <strong>P5-R3:</strong> Enforce P5-B1…P5-B9 under P5.1.</li>
+                    <li>☐ <strong>P5-R4:</strong> Required packages and install/upgrade/launch/uninstall/rollback matrix.</li>
+                    <li>☐ <strong>P5-R5:</strong> Signing/notarization/metadata; reject tampered/wrong-key artifacts.</li>
+                    <li>☐ <strong>P5-R6:</strong> Docs/tutorial/migration/changelog and external source-free Lua-config acceptance.</li>
+                  </ul>
+                  <h4>Order and evidence</h4>
+                  <ol>
+                    <li><strong>P5-A1:</strong> Approve P5.1; build ID-to-evidence matrix; close verified gaps.</li>
+                    <li><strong>P5-A2:</strong> Freeze candidates; revalidate Phase 0–4 plus reliability/recovery/compat/remote/performance/memory/platform.</li>
+                    <li><strong>P5-A3:</strong> Build/test packages, signatures/notarization, metadata/update verification.</li>
+                    <li><strong>P5-A4:</strong> Finish docs/external acceptance; publish only when P5-B1…P5-B9 and every required ID are green.</li>
+                  </ol>
+                  <p><strong>P5-E1:</strong> The ledger maps P5-R1…P5-R6, P5-A1…P5-A4, and P5-B1…P5-B9 to fixtures/hashes, raw/aggregated samples, waivers, memory audit, Phase 0–4 revalidation, release/install/signing/tamper checks, and external-user results.</p>
+                  <p><strong>Out/non-blocking:</strong> delta updates, marketplace PKI, DAP, WASM, WSL/containers, Compat L2, Enterprise/Cloud, collaboration, Flatpak. Universal macOS is preferred but non-blocking.</p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="phase-6">Phase 6+ — Separately approved post-MVP milestones</h3>
+              <details open>
+                <summary>Phase 6+ — milestone governance</summary>
+                <div class="details-body">
+                  <p>Phase 6+ is not one backlog. Each milestone has its own entry gate, ordered deliverables, evidence ledger, exclusions, threat model, and release matrix. No milestone starts before its predecessor exits.</p>
+                </div>
+              </details>
+            </article>
+
+            <article>
+              <h3 id="phase-6a">6A / 1.0 — Stability and marketplace v0</h3>
+              <p><strong>Entry:</strong> Phase 5/public MVP complete; marketplace architecture/PKI ADR accepted; 1.0 dependency graph, threat model, release matrix, and ledger plan approved. Owner: 1.0 lead plus marketplace/security; approval: ADR rule + security reviewer. <strong>Ledger:</strong> <code>docs/evidence/phase-6a-1.0.md</code>.</p>
+              <ol>
+                <li><strong>6A-R1:</strong> Stabilize/document S1 <code>nvide.*</code> and minimal API Stability Tier S3 Rust plugin SDK v1.</li>
+                <li><strong>6A-R2:</strong> Enforce semver, deprecation, migration tooling/tests, compatibility budgets, upgrade docs.</li>
+                <li><strong>6A-R3:</strong> Sustain signed updates, crash/performance/memory budgets, docs, and OS packages.</li>
+                <li><strong>6A-R4:</strong> Ship marketplace v0 only under the accepted ADR.</li>
+              </ol>
+              <p><strong>6A-E1:</strong> Maps 6A-R1…6A-R4 to API diff/semver, migration fixtures, signed update/rollback, budgets, docs, marketplace verification, malicious/tampered rejection, recovery.</p>
+              <p><strong>Threat model:</strong> supply chain, publisher impersonation, malicious packages, compromised metadata, credentials, downgrade. <strong>Release matrix:</strong> Windows/macOS/Linux packages/upgrades, S1 Lua/API Stability Tier S3 version window, marketplace online/failure/recovery. <strong>Excluded:</strong> DAP, WASM, remote parity, Compat L2, Enterprise, Cloud, research.</p>
+            </article>
+
+            <article>
+              <h3 id="phase-6b">6B / 2.0 — Platform, debugger, Compat L2, and experimental WASM</h3>
+              <p><strong>Entry:</strong> 6A/1.0 complete; focused DAP/WASM ADRs and 2.0 graph/threat/release/ledger approved. <strong>6B.1</strong> requires a feasibility report on representative 2.0 builds/workloads for every performance number below. They are candidate targets, not release commitments, until the tech lead and independent performance reviewer accept them; infeasibility requires an ADR/roadmap amendment before implementation. Owner: 2.0 remote/debug/plugin/performance leads; approval: ADR rule + security + performance reviewers. <strong>Ledger:</strong> <code>docs/evidence/phase-6b-2.0.md</code>.</p>
+              <ol>
+                <li><strong>6B-R1:</strong> WSL, Docker, Dev Containers remote parity.</li>
+                <li><strong>6B-R2:</strong> Approved DAP experience and adapter lifecycle/isolation.</li>
+                <li><strong>6B-R3:</strong> Pinned Compat L2 matrix at measured ≥70%.</li>
+                <li><strong>6B-R4:</strong> Experimental WASM under approved sandbox/capabilities.</li>
+                <li><strong>6B-R5:</strong> Multi-window/a11y and only the 6B.1-confirmed subset of candidate targets: cold &lt;200 ms, RSS &lt;80 MB, 120 FPS, 1 GiB &lt;500 ms, crash &lt;0.1%, reconnect &lt;2 s.</li>
+              </ol>
+              <p><strong>6B-E1:</strong> Maps 6B-R1…6B-R5 and 6B.1 to remote recovery, DAP fixtures, compat report, WASM isolation, accessibility, multi-window recovery, feasibility decision, and raw samples.</p>
+              <p><strong>Threat model:</strong> malicious container metadata, escape paths, adapter compromise, WASM capability/resource abuse, compat permissions. <strong>Release matrix:</strong> local OS × remote environments, adapters, WASM platforms, 1.0 migration. <strong>Excluded:</strong> Enterprise, Cloud, CRDT, NRPC v2, renderer replacement, LuaJIT.</p>
+            </article>
+
+            <article>
+              <h3 id="phase-6c">6C / Enterprise — Policy and private distribution</h3>
+              <p><strong>Entry:</strong> 6B/2.0 complete; enterprise security/policy ADR and full threat model accepted; support/SLO ownership, dependency graph, release matrix, ledger plan approved. Owner: Enterprise/security/operations; approval: ADR rule + security + release. <strong>Ledger:</strong> <code>docs/evidence/phase-6c-enterprise.md</code>.</p>
+              <ol>
+                <li><strong>6C-R1:</strong> Private registry and controlled distribution.</li>
+                <li><strong>6C-R2:</strong> SSO, centralized workspace/plugin policy, admin controls.</li>
+                <li><strong>6C-R3:</strong> Airgapped install/update/license with no undeclared network dependency.</li>
+                <li><strong>6C-R4:</strong> Tamper-evident audit logs, retention/export, support channels.</li>
+              </ol>
+              <p><strong>6C-E1:</strong> Maps 6C-R1…6C-R4 to registry auth/isolation, SSO lifecycle, policy enforcement, audit integrity/redaction/export, offline update, key rotation/revocation, incident recovery, SLO exercises.</p>
+              <p><strong>Threat model:</strong> org boundaries, malicious admins/plugins, SSO/token compromise, policy bypass, audit tamper/PII, signing keys, offline supply chain. <strong>Release matrix:</strong> enterprise OS/packages, identity providers, online/airgap, registry versions, rollback/support lifetime. <strong>Excluded:</strong> hosted multi-tenant workspaces, settings sync, thin client, research.</p>
+            </article>
+
+            <article>
+              <h3 id="phase-6d">6D / Cloud — Hosted workspaces and settings sync</h3>
+              <p><strong>Entry:</strong> 6C/Enterprise complete; Cloud tenancy/security/data-residency ADR accepted; threat model, SLOs, dependency graph, release matrix, disaster recovery, ledger plan approved. Owner: Cloud/security/operations; approval: ADR rule + security + operations/release. <strong>Ledger:</strong> <code>docs/evidence/phase-6d-cloud.md</code>.</p>
+              <ol>
+                <li><strong>6D-R1:</strong> Hosted workspace provisioning, quota, suspend/resume, deletion.</li>
+                <li><strong>6D-R2:</strong> Conflict-safe team settings sync with offline/retry/recovery.</li>
+                <li><strong>6D-R3:</strong> Optional thin client while retaining and supporting local UI.</li>
+                <li><strong>6D-R4:</strong> Tenant isolation, observability, backup/restore, regional/retention controls, incident operations.</li>
+              </ol>
+              <p><strong>6D-E1:</strong> Maps 6D-R1…6D-R4 to tenant isolation, lifecycle/quota, sync recovery, backup/failover, key rotation, deletion/retention, client compatibility, load/SLO, incident drills.</p>
+              <p><strong>Threat model:</strong> cross-tenant access, control-plane compromise, remote execution abuse, secrets, sync poisoning/conflicts, residency/retention, DoS, backups. <strong>Release matrix:</strong> local/thin clients × regions/images, degraded connectivity, schema/client compatibility, failover, rollback. <strong>Excluded:</strong> replacing local UI and research without demand plus ADR.</p>
+            </article>
+
+            <div class="callout future">
+              <div class="callout-title">Research-only boundary</div>
+              <p>CRDT collaboration, NRPC v2, renderer replacement, and LuaJIT require demonstrated demand and a focused Accepted ADR before entering any implementation milestone.</p>
+            </div>
+          </section>
+
+          <section>
+            <h2 id="reviews">Review record</h2>
+            <p>No durable external review artifact is recorded. Prior AI review output is an internal check, not approval evidence. This revision is <code>READY FOR REVIEW</code>; inspectable independent records are required before any <code>AGREE</code>.</p>
+            <article>
+              <h3 id="overall-review">Overall plan gate</h3>
+              <div class="table-wrap"><table><thead><tr><th>Reviewer</th><th>Markdown</th><th>HTML</th><th>Final</th></tr></thead><tbody>
+                <tr><td>Reviewer 1 — unassigned</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+                <tr><td>Reviewer 2 — unassigned</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+              </tbody></table></div>
+            </article>
+            <article>
+              <h3 id="detailed-review">Detailed plan gate</h3>
+              <div class="table-wrap"><table><thead><tr><th>Reviewer / format</th><th>Phase 0</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th><th>Phase 4</th><th>Phase 5</th><th>Phase 6+</th></tr></thead><tbody>
+                <tr><td>Reviewer 1 / Markdown</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+                <tr><td>Reviewer 1 / HTML</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+                <tr><td>Reviewer 2 / Markdown</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+                <tr><td>Reviewer 2 / HTML</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+              </tbody></table></div>
+            </article>
+          </section>
+
+          <section>
+            <h2 id="final-verification">Final verification checklist</h2>
+            <ul>
+              <li>☑ Phase 0–5, the Phase 6+ umbrella, and milestones 6A–6D exist in both formats.</li>
+              <li>☑ Dependencies, gates, stable IDs, deliverables, interfaces, metrics, exclusions, ADRs, threats, and release matrices match.</li>
+              <li>☑ Phase 1 preserves dirty/save failure, one-batch→one-undo, and unsupported motions.</li>
+              <li>☑ Phase 2 preserves “fully navigable” and “crash restore loses no acknowledged edit”.</li>
+              <li>☑ Assets resolve; IDs and summaries are unique; tags balance; keyboard/sidebar controls are accessible.</li>
+              <li>☑ JavaScript syntax, stable-ID, whitespace, and diff checks pass; only these two plan files changed for the task.</li>
+              <li>☐ Two independent reviewers attach inspectable records for both formats and Phase 0–5 plus the Phase 6+ umbrella before final status.</li>
+            </ul>
+          </section>
+
+          <footer class="doc-footer"><p><strong>NVide Implementation Plan</strong> · canonical Markdown parity view · Architecture v0.2.0</p></footer>
+        </main>
+      </div>
+    </div>
+    <button type="button" id="back-to-top" aria-label="Back to top" title="Back to top">↑</button>
+    <script src="../assets/document.js" defer></script>
+  </body>
+</html>
