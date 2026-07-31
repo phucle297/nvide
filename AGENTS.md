@@ -374,6 +374,23 @@ Do not add expensive benchmarks unless requested.
 
 ---
 
+# Proposed Phase 0 Rust Coding Standards
+
+Status: P0.1 REVIEW PENDING. This section is a proposal, not approval evidence.
+
+- Use Rust 2021 and stable Rust for product code, with workspace `rust-version = "1.82"`. Product code uses no nightly features; the ADR-0018 fuzz job may use a separately pinned nightly toolchain only to run `cargo-fuzz`.
+- Keep dependency versions and workspace lints in the root manifest. Commit `Cargo.lock`; build and test with `--locked` in CI.
+- A dependency must fit the current phase, four target platforms, and MSRV before it is added. Prefer the standard library and existing dependencies.
+- Required checks are `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --all-features --locked`, and `cargo +1.82 check --workspace --all-targets --all-features --locked`.
+- Public and Friend APIs return typed `Result` values for invalid input and recoverable failure. User or peer data must not cause a panic.
+- `unsafe` is allowed only at a necessary platform/FFI boundary, with a local `SAFETY` explanation and a test covering the safe wrapper. Do not spread unsafe types beyond that module.
+- New non-trivial logic includes the smallest relevant unit, property, fuzz, or subprocess test required by ADR-0018 and the current phase acceptance item.
+- Generated code is committed only when an approved generation policy names its source and check command. Never hand-edit generated output.
+- Crate dependency direction follows ADR-0011 and is CI-enforced. A dependency-cycle or forbidden edge is a build failure.
+- Formatting or refactoring unrelated files is out of scope.
+
+---
+
 # Completion Criteria
 
 A task is NOT complete unless
