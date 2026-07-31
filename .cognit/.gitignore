@@ -1,8 +1,0 @@
-# Cognit local state. Commit cognit.yaml; ignore the rest.
-cognit.db
-cognit.db-journal
-cognit.db-wal
-cognit.db-shm
-inbox/
-snapshots/
-archive/
