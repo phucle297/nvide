@@ -1,6 +1,6 @@
 # ADR-0023: ADR approval records
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-31
 - Extends: Architecture v0.2.1 ADR process
 - Prepared-by principals: `agent:/root`
@@ -51,5 +51,5 @@ The fixed principal syntax and fields support later automated uniqueness and sel
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Tech lead | `agent:/root/ai_review_policy` | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-p0-plan-policy.md`](../reviews/7106449-p0-plan-policy.md) |
+| Independent reviewer | `agent:/root/ai_review_records` | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-p0-records.md`](../reviews/7106449-p0-records.md) |

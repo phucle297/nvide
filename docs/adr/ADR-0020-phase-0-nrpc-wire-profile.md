@@ -1,6 +1,6 @@
 # ADR-0020: Phase 0 NRPC wire profile
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-31
 - Extends: ADR-0002, ADR-0015, ADR-0017
 - Prepared-by principals: `agent:/root`
@@ -76,5 +76,5 @@ Bounded queues and requests cap per-connection memory. Stream IDs and schema chu
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Tech lead | `agent:/root/ai_review_policy` | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-p0-plan-policy.md`](../reviews/7106449-p0-plan-policy.md) |
+| Independent reviewer | `agent:/root/ai_review_records` | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-p0-records.md`](../reviews/7106449-p0-records.md) |

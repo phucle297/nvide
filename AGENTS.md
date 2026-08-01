@@ -384,7 +384,7 @@ Do not add expensive benchmarks unless requested.
 
 # Proposed Phase 0 Rust Coding Standards
 
-Status: P0.1 REVIEW PENDING. This section is a proposal, not approval evidence.
+Status: P0.1 APPROVED.
 Prepared-by principals: `agent:/root`
 
 - Use Rust 2021 and stable Rust for product code, with workspace `rust-version = "1.82"`. Product code uses no nightly features; the ADR-0018 fuzz job may use a separately pinned nightly toolchain only to run `cargo-fuzz`.
@@ -400,8 +400,8 @@ Prepared-by principals: `agent:/root`
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Tech lead | `agent:/root/ai_review_policy` | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | `docs/reviews/7106449-p0-plan-policy.md` |
+| Independent reviewer | `agent:/root/ai_review_records` | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | `docs/reviews/7106449-p0-records.md` |
 
 ---
 

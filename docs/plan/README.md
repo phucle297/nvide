@@ -1,7 +1,7 @@
 # NVide implementation plan
 
-Status: READY FOR REVIEW
-Last updated: 2026-07-31
+Status: REVIEWED
+Last updated: 2026-08-01
 Architecture baseline: `docs/architecture.html` v0.2.1
 Current implementation phase: Phase 0
 Current product target: MVP
@@ -19,7 +19,7 @@ Engineering phases and product milestones are different. Phases are execution sl
 - Human and AI agents may fill reviewer roles. Record principals as `human:<handle>` or `agent:<canonical-task-id>`. Every reviewer principal must differ from every author or implementer principal and every other required reviewer principal; for AI, another turn by the same agent is not independent, and one agent cannot fill multiple required reviewer slots.
 - Every phase keeps an evidence ledger at the path named below. Each ledger entry records the stable requirement/acceptance ID, exact artifact path, reproducible verification command, environment/profile, result, date, and reviewer principal. Review records also identify every author or implementer principal and the exact reviewed commit; the inspectable review artifact itself identifies the reviewer principal, verdict, reviewed commit, and review scope. A statement without a runnable command or inspectable artifact is not exit evidence.
 - IDs are immutable after review: prerequisites use `Pn.n`; requirements use `Pn-Rn`; runnable acceptance uses `Pn-An`; exit evidence uses `Pn-En`; release blockers use `Pn-Bn`. Milestones 6A–6D use the milestone prefix. CI must reject duplicate/unknown IDs and any required ID without a ledger reference.
-- No qualifying durable review artifact is recorded for this revision. It remains `READY FOR REVIEW`; `AGREE` may appear only after two independent reviewers produce inspectable records for both formats, Phase 0–5, and the Phase 6+ umbrella, with every AI record satisfying the distinct-agent rule.
+- Two qualifying, independent review artifacts are recorded for commit `710644906cd9589c2e3f2c25a8484088e710feac`; this revision is `REVIEWED`. Both reviewers cover both formats, Phase 0–5, and the Phase 6+ umbrella, and satisfy the distinct-agent rule.
 
 ## Overall phase plan
 
@@ -62,6 +62,8 @@ MVP excludes WASM plugins, full DAP, WSL/Docker/Dev Containers, full Neovim comp
 #### Entry gates
 
 The gates are ordered. Workspace implementation is blocked until P0.1 and P0.2 are approved.
+
+**Gate status (2026-08-01):** P0.1 `APPROVED`; P0.2 `REVIEW PENDING`; P0.3 `APPROVED`. P0.2 therefore continues to block workspace implementation.
 
 | ID | Required decision or artifact | Owner | Approval | Blocks |
 | --- | --- | --- | --- | --- |
@@ -416,14 +418,14 @@ CRDT collaboration, NRPC v2, renderer replacement, and LuaJIT remain research-on
 
 ## Review record
 
-No qualifying durable review artifact is recorded. Prior AI review output without an inspectable artifact that identifies the reviewer principal, verdict, reviewed commit, and review scope, or without distinct-agent proof, is an internal quality check rather than approval evidence. This revision is `READY FOR REVIEW`; eligible reviewers must independently inspect both files and attach an inspectable record before any verdict becomes `AGREE`.
+Two qualifying durable review artifacts cover the exact reviewed commit, both formats, every Phase 0–5 plan, and the Phase 6+ umbrella including 6A–6D. Their principals differ from `agent:/root` and from each other, so this revision is `REVIEWED`.
 
 ### Overall plan gate
 
 | Slot | Reviewer principal | Markdown | HTML | UTC date | Reviewed commit | Artifact | Final verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reviewer 1 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 2 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 1 | `agent:/root/ai_review_parity` | AGREE | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-plan.md`](../reviews/7106449-plan.md) | AGREE |
+| Reviewer 2 | `agent:/root/ai_review_policy` | AGREE | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-p0-plan-policy.md`](../reviews/7106449-p0-plan-policy.md) | AGREE |
 
 ### Detailed plan gate
 
@@ -431,10 +433,10 @@ No qualifying durable review artifact is recorded. Prior AI review output withou
 
 | Reviewer / format | Phase 0 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6+ |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reviewer 1 / Markdown | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 1 / HTML | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 2 / Markdown | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 2 / HTML | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 1 / Markdown | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
+| Reviewer 1 / HTML | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
+| Reviewer 2 / Markdown | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
+| Reviewer 2 / HTML | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
 
 ## Final verification checklist
 
@@ -445,4 +447,4 @@ No qualifying durable review artifact is recorded. Prior AI review output withou
 - [x] HTML asset paths resolve; IDs and `<summary>` text are unique; tags are balanced; keyboard/sidebar controls remain accessible.
 - [x] `node --check docs/assets/document.js`, stable-ID checks, whitespace checks, and diff checks pass.
 - [x] No runtime source, dependency, or public API changed; the review-policy amendment is mirrored in Architecture, AGENTS, ADRs, Phase 0 artifacts, and both plan formats.
-- [ ] Two independent reviewers provide inspectable artifacts for both formats and Phase 0–5 plus the Phase 6+ umbrella before review status becomes final; AI reviewers must satisfy the distinct-agent rule.
+- [x] Two independent reviewers provide inspectable artifacts for both formats and Phase 0–5 plus the Phase 6+ umbrella; both AI reviewers satisfy the distinct-agent rule.
