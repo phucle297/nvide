@@ -151,7 +151,7 @@ function Assert-CompleteJoin([hashtable]$Requests, [Collections.IEnumerable]$Fra
 }
 
 function Assert-PresentationExit([int]$ExitCode, [bool]$StoppedAfterApplicationExit) {
-    if ($ExitCode -ne 0 -and !$StoppedAfterApplicationExit) {
+    if ($ExitCode -ne 0 -and !($ExitCode -eq -1 -and $StoppedAfterApplicationExit)) {
         throw "PresentMon failed: $ExitCode"
     }
 }
@@ -229,6 +229,7 @@ function Invoke-SelfTest {
         try { Assert-CompleteJoin $requests $one @{} 1; throw "exact count fixture passed" } catch { if ($_.Exception.Message -eq "exact count fixture passed") { throw } }
         Assert-PresentationExit -1 $true
         try { Assert-PresentationExit -1 $false; throw "authority exit fixture passed" } catch { if ($_.Exception.Message -eq "authority exit fixture passed") { throw } }
+        try { Assert-PresentationExit 5 $true; throw "unexpected authority exit fixture passed" } catch { if ($_.Exception.Message -eq "unexpected authority exit fixture passed") { throw } }
 
         $child = Start-Process -FilePath powershell.exe -ArgumentList @("-NoProfile", "-Command", "Start-Sleep -Seconds 30") -PassThru
         Stop-ProcessSafely $child
