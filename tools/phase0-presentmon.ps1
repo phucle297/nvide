@@ -160,6 +160,10 @@ function Should-StopAfterApplicationExit([int]$ExitCode, [int64]$ExitObservedMs,
     return $ExitCode -ne 0 -or $NowMs - $LastOutputMs -ge 1000 -or $NowMs - $ExitObservedMs -ge 5000
 }
 
+function Should-StopCaptureAfterApplicationExit([string]$WorkloadKind, [int]$ExitCode, [int64]$ExitObservedMs, [int64]$LastOutputMs, [int64]$NowMs) {
+    return $ExitCode -ne 0 -or ($WorkloadKind -eq "edit" -and (Should-StopAfterApplicationExit $ExitCode $ExitObservedMs $LastOutputMs $NowMs))
+}
+
 function Should-RetryAtomicReplace([int]$ErrorCode, [int64]$ElapsedMs) {
     return ($ErrorCode -eq 5 -or $ErrorCode -eq 32) -and $ElapsedMs -lt 250
 }
@@ -246,6 +250,9 @@ function Invoke-SelfTest {
         if (!(Should-StopAfterApplicationExit 0 0 500 1500)) { throw "quiet-drain fixture did not stop" }
         if (!(Should-StopAfterApplicationExit 5 0 0 0)) { throw "failed-application fixture did not stop" }
         if (!(Should-StopAfterApplicationExit 0 0 4999 5000)) { throw "drain-cap fixture did not stop" }
+        if (Should-StopCaptureAfterApplicationExit "clear" 0 0 0 5000) { throw "successful clear fixture stopped authority early" }
+        if (!(Should-StopCaptureAfterApplicationExit "clear" 5 0 0 0)) { throw "failed clear fixture did not stop authority" }
+        if (!(Should-StopCaptureAfterApplicationExit "edit" 0 0 0 1000)) { throw "successful edit fixture did not stop after quiet drain" }
         if (!(Should-RetryAtomicReplace 5 249)) { throw "access-denied retry fixture did not retry" }
         if (!(Should-RetryAtomicReplace 32 0)) { throw "sharing-violation retry fixture did not retry" }
         if (Should-RetryAtomicReplace 5 250) { throw "atomic-replace retry fixture exceeded its cap" }
@@ -420,7 +427,7 @@ try {
                 if ($null -eq $applicationExitObservedMilliseconds) {
                     $applicationExitObservedMilliseconds = $nowMilliseconds
                 }
-                if (Should-StopAfterApplicationExit $app.ExitCode $applicationExitObservedMilliseconds $lastOutputMilliseconds $nowMilliseconds) {
+                if (Should-StopCaptureAfterApplicationExit $Kind $app.ExitCode $applicationExitObservedMilliseconds $lastOutputMilliseconds $nowMilliseconds) {
                     $postExitDrainMilliseconds = $nowMilliseconds - $applicationExitObservedMilliseconds
                     $stoppedAfterApplicationExit = $true
                     Stop-PresentationCapture $presentMon $PresentMonExe $session
@@ -478,6 +485,9 @@ try {
                 $acknowledged[$request.Sequence] = $true
             }
         }
+    }
+    if ($null -ne $applicationExitObservedMilliseconds) {
+        $postExitDrainMilliseconds = [Math]::Max($postExitDrainMilliseconds, $streamClock.ElapsedMilliseconds - $applicationExitObservedMilliseconds)
     }
 
     if (!$headerSeen -or $rows -eq 0 -or [string]::IsNullOrWhiteSpace($swapchain)) { throw "PresentMon captured no bound frames with the exact v1 schema" }

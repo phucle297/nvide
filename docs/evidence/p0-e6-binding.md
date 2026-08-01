@@ -1,6 +1,6 @@
 # P0.2 native presentation binding revalidation candidate
 
-- Status: EXIT BINDING REVALIDATION APPROVED; NOT P0-E6 EVIDENCE
+- Status: SUPERSEDED BY CLEAR AUTHORITY-COMPLETION AMENDMENT; REVALIDATION REQUIRED; NOT P0-E6 EVIDENCE
 - Candidate implementation commit: `2d9ed1412657dca23f061017fc0ed0f9508b5278`
 - Owner: Performance owner
 - Prepared by: `agent:/root`
