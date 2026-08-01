@@ -164,6 +164,10 @@ function Should-RetryAtomicReplace([int]$ErrorCode, [int64]$ElapsedMs) {
     return ($ErrorCode -eq 5 -or $ErrorCode -eq 32) -and $ElapsedMs -lt 250
 }
 
+function Should-AttemptAtomicReplace([bool]$PreviousAttemptFailed, [int64]$ElapsedMs) {
+    return !$PreviousAttemptFailed -or $ElapsedMs -lt 250
+}
+
 function New-EvidenceDirectory([string]$Path) {
     if (Test-Path -LiteralPath $Path) {
         throw "evidence output already exists: $Path"
@@ -246,6 +250,9 @@ function Invoke-SelfTest {
         if (!(Should-RetryAtomicReplace 32 0)) { throw "sharing-violation retry fixture did not retry" }
         if (Should-RetryAtomicReplace 5 250) { throw "atomic-replace retry fixture exceeded its cap" }
         if (Should-RetryAtomicReplace 2 0) { throw "unexpected atomic-replace error was retried" }
+        if (!(Should-AttemptAtomicReplace $false 250)) { throw "first atomic-replace attempt was capped" }
+        if (!(Should-AttemptAtomicReplace $true 249)) { throw "atomic-replace retry stopped early" }
+        if (Should-AttemptAtomicReplace $true 250) { throw "atomic-replace retry attempted after its cap" }
 
         $child = Start-Process -FilePath powershell.exe -ArgumentList @("-NoProfile", "-Command", "Start-Sleep -Seconds 30") -PassThru
         Stop-ProcessSafely $child
@@ -451,12 +458,22 @@ try {
                 $temporaryAck = "$ackPath.tmp-$($processInfo.dwProcessId)-$($request.Sequence)"
                 [IO.File]::WriteAllText($temporaryAck, $ack, $utf8)
                 $replaceWait = [Diagnostics.Stopwatch]::StartNew()
-                while (![Phase0Native]::MoveFileExW($temporaryAck, $ackPath, 0x00000009)) {
+                $replaceFailed = $false
+                $replaceError = 0
+                while (Should-AttemptAtomicReplace $replaceFailed $replaceWait.ElapsedMilliseconds) {
+                    if ([Phase0Native]::MoveFileExW($temporaryAck, $ackPath, 0x00000009)) {
+                        $replaceFailed = $false
+                        break
+                    }
+                    $replaceFailed = $true
                     $replaceError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
                     if (!(Should-RetryAtomicReplace $replaceError $replaceWait.ElapsedMilliseconds)) {
                         throw "atomic acknowledgement replace failed: $replaceError"
                     }
-                    Start-Sleep -Milliseconds 5
+                    Start-Sleep -Milliseconds ([Math]::Min(5, 250 - $replaceWait.ElapsedMilliseconds))
+                }
+                if ($replaceFailed) {
+                    throw "atomic acknowledgement replace failed: $replaceError"
                 }
                 $acknowledged[$request.Sequence] = $true
             }
