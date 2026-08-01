@@ -780,7 +780,14 @@ impl<S: Read + Write> Client<S> {
     }
 
     pub fn heartbeat(&mut self, sequence: u64) -> Result<(), ProtocolError> {
-        let deadline = Instant::now() + QUEUE_WAIT;
+        self.heartbeat_before(sequence, Instant::now() + QUEUE_WAIT)
+    }
+
+    pub fn heartbeat_before(
+        &mut self,
+        sequence: u64,
+        deadline: Instant,
+    ) -> Result<(), ProtocolError> {
         Session::heartbeat(sequence)?.write_to_before(&mut self.stream, deadline)?;
         flush_before(&mut self.stream, deadline)?;
         let reply = read_frame_before(&mut self.stream, self.session.maximum_payload(), deadline)?

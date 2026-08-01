@@ -1133,7 +1133,10 @@ impl CoreSupervisor {
     fn heartbeat(&mut self, sequence: u64) -> CoreHealth {
         let result = match self.child.try_wait() {
             Ok(Some(_)) => Err(UiError("core process exited".to_owned())),
-            Ok(None) => self.client.heartbeat(sequence).map_err(display_error),
+            Ok(None) => self
+                .client
+                .heartbeat_before(sequence, Instant::now() + HEARTBEAT_INTERVAL)
+                .map_err(display_error),
             Err(error) => Err(display_error(error)),
         };
         match result {
@@ -1381,6 +1384,26 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn phase0_hung_core_fixture() -> Result<(), Box<dyn Error>> {
+        use std::io::Write;
+
+        let endpoint = env::var(nvide_platform::NRPC_ENDPOINT_ENV)?;
+        let mut stream = nvide_ipc::LocalStream::connect(&endpoint)?;
+        let mut session = nvide_ipc::Session::new(
+            nvide_ipc::Side::Listener,
+            schema::Role::Core,
+            nvide_ipc::MAX_PAYLOAD,
+        );
+        let hello = nvide_ipc::read_frame(&mut stream, nvide_ipc::MAX_PAYLOAD)?
+            .ok_or("hung fixture received no handshake")?;
+        session.accept_hello(hello)?.write_to(&mut stream)?;
+        stream.flush()?;
+        std::thread::sleep(Duration::from_secs(10));
+        Ok(())
+    }
+
+    #[test]
     fn restart_budget_exhausts_and_drops_old_crashes() -> Result<(), UiError> {
         let now = Instant::now();
         let mut budget = RestartBudget::default();
@@ -1555,6 +1578,21 @@ mod tests {
         supervisor.child.kill()?;
         supervisor.child.wait()?;
         assert!(supervisor.restart().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hung_core_misses_three_heartbeats_before_restart() -> Result<(), Box<dyn Error>> {
+        let command = fixture_command("tests::phase0_hung_core_fixture", true)?;
+        let mut supervisor = CoreSupervisor::start(command)?;
+        assert_eq!(supervisor.heartbeat(1), CoreHealth::Missed);
+        assert_eq!(supervisor.heartbeat(2), CoreHealth::Missed);
+        assert!(matches!(supervisor.heartbeat(3), CoreHealth::Unhealthy(_)));
+        supervisor.last_healthy -= Duration::from_secs(2);
+        assert!(matches!(
+            supervisor.heartbeat(4),
+            CoreHealth::RestartRequired(_)
+        ));
         Ok(())
     }
 

@@ -301,7 +301,7 @@ mod local {
         }
 
         fn flush(&mut self) -> io::Result<()> {
-            self.0.flush()
+            Ok(())
         }
     }
 
@@ -337,9 +337,9 @@ pub use local::{monotonic_ns, LocalListener, LocalStream};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Read;
-    #[cfg(unix)]
-    use std::io::Write;
+    use std::io::{Read, Write};
+    #[cfg(windows)]
+    use std::time::{Duration, Instant};
 
     #[cfg(unix)]
     #[test]
@@ -371,6 +371,28 @@ mod tests {
         reader
             .join()
             .map_err(|_| std::io::Error::other("reader thread panicked"))??;
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn named_pipe_flush_does_not_wait_for_peer_read() -> std::io::Result<()> {
+        let endpoint = format!("nvide-platform-flush-{}", std::process::id());
+        let listener = LocalListener::bind(&endpoint)?;
+        let writer = std::thread::spawn(move || -> std::io::Result<Duration> {
+            let mut stream = listener.accept()?;
+            stream.write_all(b"nrpc")?;
+            let started = Instant::now();
+            stream.flush()?;
+            Ok(started.elapsed())
+        });
+        let client = LocalStream::connect(&endpoint)?;
+        std::thread::sleep(Duration::from_millis(100));
+        drop(client);
+        let elapsed = writer
+            .join()
+            .map_err(|_| std::io::Error::other("writer thread panicked"))??;
+        assert!(elapsed < Duration::from_millis(50));
         Ok(())
     }
 }
