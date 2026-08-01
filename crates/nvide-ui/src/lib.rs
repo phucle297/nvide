@@ -26,7 +26,7 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
 const MAX_RESTARTS: usize = 3;
 const EDIT_STABILIZATION: Duration = Duration::from_secs(1);
-const EDIT_FINALIZER_DELAY: Duration = Duration::from_millis(10);
+const EDIT_FINALIZER_DELAY: Duration = Duration::from_millis(50);
 const EDIT_SENTINELS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 #[derive(Debug)]
