@@ -77,7 +77,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly-2026-07-01
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-07-01
       - run: cargo install cargo-fuzz --version 0.13.2 --locked
       - run: cargo fuzz run buffer -- -runs=1000
       - run: cargo fuzz run nrpc -- -runs=1000
