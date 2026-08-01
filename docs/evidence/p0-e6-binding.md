@@ -1,4 +1,4 @@
-# P0.2 native presentation binding revalidation candidate
+# P0.2 native presentation binding revalidation
 
 - Status: EXIT BINDING REVALIDATION APPROVED; NOT P0-E6 EVIDENCE
 - Candidate implementation commit: `6c4542eefe14d3d3f9aad28ea3e847c827654023`

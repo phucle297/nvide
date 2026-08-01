@@ -63,7 +63,7 @@ MVP excludes WASM plugins, full DAP, WSL/Docker/Dev Containers, full Neovim comp
 
 The gates are ordered. Workspace implementation is blocked until P0.1 and the P0.2 protocol are approved. The P0.2 reference-host/tool/calibration binding remains mandatory before P0-E6 and Phase 0 exit.
 
-**Gate status (2026-08-01):** P0.1 `APPROVED`; P0.2 protocol `APPROVED` and exit binding `PENDING`; P0.3 `APPROVED`. Workspace implementation may proceed; P0-E6 and Phase 0 exit remain blocked on the P0.2 exit binding.
+**Gate status (2026-08-01):** P0.1, the P0.2 protocol and exit binding, and P0.3 are `APPROVED`. P0-E1…P0-E5 are reviewed; the immutable P0-E6 workload is ready for final independent review. P0-E6 and Phase 0 exit remain pending those verdicts.
 
 | ID | Required decision or artifact | Owner | Approval | Blocks |
 | --- | --- | --- | --- | --- |
