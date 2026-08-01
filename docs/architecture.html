@@ -25,7 +25,7 @@
         <span class="brand-mark">N</span>
         <span>NVide Architecture</span>
       </a>
-      <span class="meta">v1.0 · Technical Design Document</span>
+      <span class="meta">v0.2.1 · Technical Design Document</span>
       <div class="spacer"></div>
       <div class="toolbar">
         <input
@@ -76,7 +76,7 @@
               </div>
               <div>
                 <dt>Architecture Version</dt>
-                <dd>0.2.0</dd>
+                <dd>0.2.1</dd>
               </div>
               <div>
                 <dt>ADR Catalog Version</dt>
@@ -114,7 +114,11 @@
               </div>
               <div>
                 <dt>Last Updated</dt>
-                <dd>2026-07-23</dd>
+                <dd>2026-07-31</dd>
+              </div>
+              <div>
+                <dt>Prepared-by principal</dt>
+                <dd><code>agent:/root</code></dd>
               </div>
             </dl>
             <div class="badge-row">
@@ -195,7 +199,26 @@
                       <td>Who may accept</td>
                       <td>
                         Tech lead + one reviewer (or RFC vote for cross-cutting
-                        ADRs)
+                        ADRs). Human and AI agents may fill reviewer roles.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Reviewer independence</td>
+                      <td>
+                        Record principals as <code>human:&lt;handle&gt;</code> or
+                        <code>agent:&lt;canonical-task-id&gt;</code>. Every reviewer
+                        principal must differ from every author or implementer
+                        principal and from every other required reviewer. A new
+                        turn by the same agent is not an independent review.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Approval evidence</td>
+                      <td>
+                        Record role, reviewer principal, verdict, UTC date,
+                        exact reviewed commit, and an inspectable artifact. The
+                        artifact itself identifies the same principal, verdict,
+                        reviewed commit, and review scope.
                       </td>
                     </tr>
                     <tr>
@@ -877,7 +900,7 @@
                     <tr>
                       <td>Architecture document</td>
                       <td>Semver</td>
-                      <td><code>0.2.0</code> (this file)</td>
+                      <td><code>0.2.1</code> (this file)</td>
                       <td>
                         Minor = additive sections; major = rewrite of model
                       </td>
@@ -4729,8 +4752,8 @@ events → other plugins / LSP / UI</code></pre>
 
           <footer class="doc-footer">
             <p>
-              <strong>NVide Architecture Document</strong> · Architecture v0.2.0
-              · ADR catalog 2026.07 · 2026-07-23
+              <strong>NVide Architecture Document</strong> · Architecture v0.2.1
+              · ADR catalog 2026.07 · 2026-07-31
             </p>
             <p>
               This document is the architecture baseline for the NVide native

@@ -3,6 +3,7 @@
 - Status: Proposed
 - Date: 2026-07-31
 - Extends: ADR-0005, ADR-0012, ADR-0013
+- Prepared-by principals: `agent:/root`
 
 ## Context
 
@@ -53,7 +54,7 @@ Ropey's indexed chunks provide logarithmic edit/query behavior without a second 
 
 ## Approval record
 
-| Role | Reviewer | Verdict | UTC date | Reviewed commit | Artifact |
+| Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
 | Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
 | Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |

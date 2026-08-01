@@ -3,6 +3,7 @@
 - Status: Proposed
 - Date: 2026-07-31
 - Extends: ADR-0003, ADR-0010, ADR-0011
+- Prepared-by principals: `agent:/root`
 
 ## Context
 
@@ -53,7 +54,7 @@ The glyph atlas and shaped-run boundary support later scene/damage work without 
 
 ## Approval record
 
-| Role | Reviewer | Verdict | UTC date | Reviewed commit | Artifact |
+| Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
 | Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
 | Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |

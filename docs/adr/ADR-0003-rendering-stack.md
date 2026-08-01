@@ -2,10 +2,11 @@
 
 - Status: Accepted
 - Catalog source: Architecture v0.2.0
-- Acceptance record attachment: PENDING
+- Acceptance revalidation: PENDING
+- Prepared-by principals: `agent:/root`
 - Date: 2026-07-31
 
-This file records the accepted catalog decision. Its presence is not P0.1 approval evidence until the tech lead and one reviewer attach an inspectable review record.
+This file records the accepted catalog decision. Its presence is not P0.1 approval evidence until the tech lead and one independent reviewer complete the record below.
 
 ## Context
 
@@ -55,3 +56,10 @@ The toolkit remains internal. A future renderer or UI replacement requires an Ac
 ## Scalability
 
 The retained scene graph, damage tracking, glyph atlas, and virtualization are the path to many splits, multiple high-DPI monitors, and 120 Hz presentation. The Phase 0 prototype may be replaced once; no public renderer API is frozen.
+
+## Approval record
+
+| Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
+| --- | --- | --- | --- | --- | --- |
+| Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |

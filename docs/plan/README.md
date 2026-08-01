@@ -1,10 +1,11 @@
 # NVide implementation plan
 
 Status: READY FOR REVIEW
-Last reviewed: 2026-07-31
-Architecture baseline: `docs/architecture.html` v0.2.0
+Last updated: 2026-07-31
+Architecture baseline: `docs/architecture.html` v0.2.1
 Current implementation phase: Phase 0
 Current product target: MVP
+Prepared-by principals: `agent:/root`
 
 This Markdown file is the canonical implementation plan for AI contributors. `docs/plan/index.html` is the equivalent human-readable view and may shorten prose, but it must preserve every normative gate, interface, metric, exclusion, and ADR mapping in this file.
 
@@ -12,12 +13,13 @@ Engineering phases and product milestones are different. Phases are execution sl
 
 ## Plan governance
 
-- Architecture v0.2.0 and Accepted ADR-0001…ADR-0019 remain authoritative.
+- Architecture v0.2.1 and Accepted ADR-0001…ADR-0019 remain authoritative.
 - A requirement absent from the Architecture is a prerequisite decision or artifact, not an implementation detail to guess.
 - The phase lead owns each prerequisite unless a narrower owner is named. An ADR requires the Architecture's acceptance rule: tech lead plus one reviewer, or an RFC vote when cross-cutting. A non-ADR artifact requires the phase lead plus one independent reviewer. Security artifacts also require a security reviewer.
-- Every phase keeps an evidence ledger at the path named below. Each ledger entry records the stable requirement/acceptance ID, exact artifact path, reproducible verification command, environment/profile, result, date, and reviewer. A statement without a runnable command or inspectable artifact is not exit evidence.
+- Human and AI agents may fill reviewer roles. Record principals as `human:<handle>` or `agent:<canonical-task-id>`. Every reviewer principal must differ from every author or implementer principal and every other required reviewer principal; for AI, another turn by the same agent is not independent, and one agent cannot fill multiple required reviewer slots.
+- Every phase keeps an evidence ledger at the path named below. Each ledger entry records the stable requirement/acceptance ID, exact artifact path, reproducible verification command, environment/profile, result, date, and reviewer principal. Review records also identify every author or implementer principal and the exact reviewed commit; the inspectable review artifact itself identifies the reviewer principal, verdict, reviewed commit, and review scope. A statement without a runnable command or inspectable artifact is not exit evidence.
 - IDs are immutable after review: prerequisites use `Pn.n`; requirements use `Pn-Rn`; runnable acceptance uses `Pn-An`; exit evidence uses `Pn-En`; release blockers use `Pn-Bn`. Milestones 6A–6D use the milestone prefix. CI must reject duplicate/unknown IDs and any required ID without a ledger reference.
-- No durable external review artifact is recorded for this revision. It remains `READY FOR REVIEW`; `AGREE` may appear only after two independent reviewers produce inspectable records for both formats, Phase 0–5, and the Phase 6+ umbrella.
+- No qualifying durable review artifact is recorded for this revision. It remains `READY FOR REVIEW`; `AGREE` may appear only after two independent reviewers produce inspectable records for both formats, Phase 0–5, and the Phase 6+ umbrella, with every AI record satisfying the distinct-agent rule.
 
 ## Overall phase plan
 
@@ -63,7 +65,7 @@ The gates are ordered. Workspace implementation is blocked until P0.1 and P0.2 a
 
 | ID | Required decision or artifact | Owner | Approval | Blocks |
 | --- | --- | --- | --- | --- |
-| P0.1 | Canonical ADR-0002/0003/0005 records plus coding standards and ADR workflow, consistent with Architecture v0.2.0 | Tech lead | ADR acceptance rule; coding standard by tech lead + independent reviewer | All Phase 0 implementation |
+| P0.1 | Canonical ADR-0002/0003/0005 records plus coding standards and ADR workflow, consistent with Architecture v0.2.1 | Tech lead | ADR acceptance rule; coding standard by tech lead + independent reviewer | All Phase 0 implementation |
 | P0.2 | Benchmark/trace profile naming hardware, OS/toolchain, release build command, warmup, samples, tool, aggregation, and pass rule. “120 FPS clear” means actually presented steady-state frames for an empty window with no workspace/plugins at the fixed resolution/vsync after warmup. The UI↔core fixture uses a unique scripted edit and correlates UI dispatch → core version increment → viewport receipt → first presented glyph; it is a complete-path proof, not an unspecified latency claim. | Performance owner | Phase lead + independent performance reviewer | All Phase 0 workspace implementation |
 | P0.3 | Approved `xtask` command surface and canonical generated-schema ownership/check policy | Build owner | Phase lead + independent reviewer | Schema implementation |
 
@@ -414,16 +416,18 @@ CRDT collaboration, NRPC v2, renderer replacement, and LuaJIT remain research-on
 
 ## Review record
 
-No durable external review artifact is recorded. Prior AI review output is an internal quality check, not approval evidence. This revision is `READY FOR REVIEW`; reviewers must independently inspect both files and attach an inspectable record before any verdict becomes `AGREE`.
+No qualifying durable review artifact is recorded. Prior AI review output without an inspectable artifact that identifies the reviewer principal, verdict, reviewed commit, and review scope, or without distinct-agent proof, is an internal quality check rather than approval evidence. This revision is `READY FOR REVIEW`; eligible reviewers must independently inspect both files and attach an inspectable record before any verdict becomes `AGREE`.
 
 ### Overall plan gate
 
-| Reviewer | Markdown | HTML | Final verdict / artifact |
-| --- | --- | --- | --- |
-| Reviewer 1 — unassigned | PENDING | PENDING | PENDING |
-| Reviewer 2 — unassigned | PENDING | PENDING | PENDING |
+| Slot | Reviewer principal | Markdown | HTML | UTC date | Reviewed commit | Artifact | Final verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Reviewer 1 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 2 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
 
 ### Detailed plan gate
+
+`Reviewer 1` and `Reviewer 2` below refer to the principals, reviewed commit, and artifacts in the overall gate. A detailed verdict is invalid if that binding is missing or violates the distinct-agent rule.
 
 | Reviewer / format | Phase 0 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6+ |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -440,5 +444,5 @@ No durable external review artifact is recorded. Prior AI review output is an in
 - [x] Phase 2 HTML states both “fully navigable” and “crash restore loses no acknowledged edit.”
 - [x] HTML asset paths resolve; IDs and `<summary>` text are unique; tags are balanced; keyboard/sidebar controls remain accessible.
 - [x] `node --check docs/assets/document.js`, stable-ID checks, whitespace checks, and diff checks pass.
-- [x] No file or dependency outside `docs/plan/README.md` and `docs/plan/index.html` changed for this task.
-- [ ] Two independent reviewers provide inspectable artifacts for both formats and Phase 0–5 plus the Phase 6+ umbrella before review status becomes final.
+- [x] No runtime source, dependency, or public API changed; the review-policy amendment is mirrored in Architecture, AGENTS, ADRs, Phase 0 artifacts, and both plan formats.
+- [ ] Two independent reviewers provide inspectable artifacts for both formats and Phase 0–5 plus the Phase 6+ umbrella before review status becomes final; AI reviewers must satisfy the distinct-agent rule.

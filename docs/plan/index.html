@@ -11,7 +11,7 @@
     <header class="doc-header">
       <button type="button" id="sidebar-toggle" class="icon-btn" aria-label="Toggle table of contents" aria-controls="sidebar" aria-expanded="false">☰</button>
       <a class="brand" href="#top"><span class="brand-mark">N</span><span>NVide Plan</span></a>
-      <span class="meta">Architecture v0.2.0 · Ready for review</span>
+      <span class="meta">Architecture v0.2.1 · Ready for review</span>
       <div class="spacer"></div>
       <div class="toolbar">
         <input type="search" id="search-input" placeholder="Search document…" aria-label="Search within document" autocomplete="off" />
@@ -33,29 +33,31 @@
             <p class="subtitle">Architecture-bound execution plan from Phase 0 foundations through separately approved post-MVP milestones.</p>
             <dl class="cover-grid">
               <div><dt>Status</dt><dd>READY FOR REVIEW</dd></div>
-              <div><dt>Last reviewed</dt><dd>2026-07-31</dd></div>
-              <div><dt>Architecture</dt><dd>v0.2.0</dd></div>
+              <div><dt>Last updated</dt><dd>2026-07-31</dd></div>
+              <div><dt>Architecture</dt><dd>v0.2.1</dd></div>
               <div><dt>Current phase</dt><dd>Phase 0</dd></div>
               <div><dt>Current target</dt><dd>MVP</dd></div>
               <div><dt>Canonical source</dt><dd><code>docs/plan/README.md</code></dd></div>
+              <div><dt>Prepared by</dt><dd><code>agent:/root</code></dd></div>
             </dl>
           </div>
 
           <div class="callout important">
             <div class="callout-title">Canonical plan and review state</div>
-            <p>The Markdown plan is canonical. This HTML may shorten prose but must preserve every normative gate, stable ID, interface, metric, exclusion, and ADR mapping. No durable external review artifact exists, so this revision is ready for review rather than approved.</p>
+            <p>The Markdown plan is canonical. This HTML may shorten prose but must preserve every normative gate, stable ID, interface, metric, exclusion, and ADR mapping. No qualifying durable review artifact exists, so this revision is ready for review rather than approved.</p>
           </div>
 
           <section>
             <h2 id="governance">Plan governance</h2>
             <ul>
-              <li>Architecture v0.2.0 and Accepted ADR-0001…ADR-0019 remain authoritative.</li>
+              <li>Architecture v0.2.1 and Accepted ADR-0001…ADR-0019 remain authoritative.</li>
               <li>A requirement absent from Architecture becomes a prerequisite decision or artifact; implementation does not guess it.</li>
               <li>The phase lead owns prerequisites unless a narrower owner is named. ADRs use the Architecture acceptance rule. Other artifacts require the phase lead and one independent reviewer; security artifacts also require a security reviewer.</li>
-              <li>Each phase creates the named evidence ledger during implementation. Every entry records its stable requirement/acceptance ID, artifact path, command, environment/profile, result, date, and reviewer. A claim without a runnable command or inspectable artifact is not exit evidence.</li>
+              <li>Human and AI agents may fill reviewer roles. Record principals as <code>human:&lt;handle&gt;</code> or <code>agent:&lt;canonical-task-id&gt;</code>. Every reviewer principal must differ from every author or implementer and every other required reviewer; for AI, another turn by the same agent is not independent, and one agent cannot fill multiple required reviewer slots.</li>
+              <li>Each phase creates the named evidence ledger during implementation. Every entry records its stable requirement/acceptance ID, artifact path, command, environment/profile, result, date, and reviewer principal. Review records also name every author or implementer principal and exact reviewed commit; the inspectable review artifact itself identifies the reviewer principal, verdict, reviewed commit, and review scope. A claim without a runnable command or inspectable artifact is not exit evidence.</li>
               <li>IDs are immutable after review: prerequisites use <code>Pn.n</code>, requirements <code>Pn-Rn</code>, acceptance <code>Pn-An</code>, evidence <code>Pn-En</code>, and blockers <code>Pn-Bn</code>; 6A–6D use their milestone prefix. CI must reject duplicate/unknown IDs and required IDs without ledger references.</li>
               <li>A phase starts only after dependencies and all prerequisites are approved. Phase 4 may overlap Phase 3 only after Phase 2 exits.</li>
-              <li>No <code>AGREE</code> verdict is valid without two inspectable, independent review records covering both formats, Phase 0–5, and the Phase 6+ umbrella.</li>
+              <li>No <code>AGREE</code> verdict is valid without two inspectable, independent review records covering both formats, Phase 0–5, and the Phase 6+ umbrella; every AI record must satisfy the distinct-agent rule.</li>
             </ul>
           </section>
 
@@ -110,9 +112,9 @@
                 <div class="details-body">
                   <p><strong>Entry order:</strong> P0.1 and P0.2 block all workspace implementation; P0.3 blocks schema work.</p>
                   <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
-                    <tr><td>P0.1</td><td>Canonical ADR-0002/0003/0005 records, coding standards, and ADR workflow matching v0.2.0</td><td>Tech lead; ADR rule and independent coding-standard review</td></tr>
-                    <tr><td>P0.2</td><td>Benchmark/trace profile: hardware, OS/toolchain, release build, warmup, samples, tool, aggregation, pass rule. “120 FPS clear” is actually presented steady-state frames for an empty no-workspace/no-plugin window at fixed resolution/vsync. The scripted UI↔core edit correlates dispatch → core version → viewport receipt → first presented glyph.</td><td>Performance owner; phase lead + performance reviewer</td></tr>
-                    <tr><td>P0.3</td><td>Approved <code>xtask</code> command surface and generated-schema ownership/check policy</td><td>Build owner; phase lead + reviewer</td></tr>
+                    <tr><td>P0.1</td><td>Canonical ADR-0002/0003/0005 records, coding standards, and ADR workflow matching v0.2.1</td><td>Tech lead; ADR rule and independent coding-standard review</td></tr>
+                    <tr><td>P0.2</td><td>Benchmark/trace profile: hardware, OS/toolchain, release build, warmup, samples, tool, aggregation, pass rule. “120 FPS clear” is actually presented steady-state frames for an empty no-workspace/no-plugin window at fixed resolution/vsync. The scripted UI↔core edit correlates dispatch → core version → viewport receipt → first presented glyph.</td><td>Performance owner; phase lead + independent performance reviewer</td></tr>
+                    <tr><td>P0.3</td><td>Approved <code>xtask</code> command surface and generated-schema ownership/check policy</td><td>Build owner; phase lead + independent reviewer</td></tr>
                   </tbody></table></div>
                   <h4>Requirements</h4>
                   <ul>
@@ -157,9 +159,9 @@
                 <summary>Phase 1 — gates, scope, and acceptance</summary>
                 <div class="details-body">
                   <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
-                    <tr><td>P1.1</td><td>Normal/insert/visual action-key matrix, included count/register behavior, explicit unsupported list</td><td>Editor owner; phase lead + reviewer</td></tr>
-                    <tr><td>P1.2</td><td>Autocmd events, ordering, nesting/reentrancy, cancellation, and per-handler/error behavior</td><td>Config owner; phase lead + reviewer</td></tr>
-                    <tr><td>P1.3</td><td>Dogfood/startup protocol: laptop, workload, cold definition, build, warmup, samples, aggregation, coding-time capture, pass rule</td><td>Performance owner; phase lead + reviewer</td></tr>
+                    <tr><td>P1.1</td><td>Normal/insert/visual action-key matrix, included count/register behavior, explicit unsupported list</td><td>Editor owner; phase lead + independent reviewer</td></tr>
+                    <tr><td>P1.2</td><td>Autocmd events, ordering, nesting/reentrancy, cancellation, and per-handler/error behavior</td><td>Config owner; phase lead + independent reviewer</td></tr>
+                    <tr><td>P1.3</td><td>Dogfood/startup protocol: laptop, workload, cold definition, build, warmup, samples, aggregation, coding-time capture, pass rule</td><td>Performance owner; phase lead + independent reviewer</td></tr>
                     <tr><td>P1.4</td><td>ADR resolving Phase 1 Lua config versus Phase 3 plugin host, pre-plugin load order, and any stable Lua/settings promise</td><td>Tech lead; ADR acceptance rule</td></tr>
                   </tbody></table></div>
                   <h4>Requirements</h4>
@@ -198,9 +200,9 @@
                 <summary>Phase 2 — gates, scope, and acceptance</summary>
                 <div class="details-body">
                   <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
-                    <tr><td>P2.1</td><td>Executable Rust/TypeScript navigation fixtures, expected results, pinned rust-analyzer and TypeScript server versions</td><td>Language owner; phase lead + reviewer</td></tr>
-                    <tr><td>P2.2</td><td>Complete MVP command-palette command/provider inventory</td><td>UI owner; phase lead + reviewer</td></tr>
-                    <tr><td>P2.3</td><td>WAL acknowledgement/durability contract and UI/core/hosts crash matrix at before/after-ACK points</td><td>Core owner; ADR if architecture changes, otherwise phase lead + reviewer</td></tr>
+                    <tr><td>P2.1</td><td>Executable Rust/TypeScript navigation fixtures, expected results, pinned rust-analyzer and TypeScript server versions</td><td>Language owner; phase lead + independent reviewer</td></tr>
+                    <tr><td>P2.2</td><td>Complete MVP command-palette command/provider inventory</td><td>UI owner; phase lead + independent reviewer</td></tr>
+                    <tr><td>P2.3</td><td>WAL acknowledgement/durability contract and UI/core/hosts crash matrix at before/after-ACK points</td><td>Core owner; ADR if architecture changes, otherwise phase lead + independent reviewer</td></tr>
                   </tbody></table></div>
                   <div class="callout security"><div class="callout-title">Locked trust rule</div><p>ADR-0016 allows gitoxide status/diff read-only in untrusted workspaces. Every Git CLI write and hook-capable operation stays blocked until trust.</p></div>
                   <h4>Requirements</h4>
@@ -246,7 +248,7 @@
                 <summary>Phase 3 — gates, contracts, and acceptance</summary>
                 <div class="details-body">
                   <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
-                    <tr><td>P3.1</td><td>Frozen 5–10 plugins, fixed commits/versions, smoke actions/results, Tier-A denominator/calculation</td><td>Compat owner; phase lead + two reviewers</td></tr>
+                    <tr><td>P3.1</td><td>Frozen 5–10 plugins, fixed commits/versions, smoke actions/results, Tier-A denominator/calculation</td><td>Compat owner; phase lead + two independent reviewers</td></tr>
                     <tr><td>P3.2</td><td>Minimal API Stability Tier S3 (Rust plugin SDK) v1 contract and deprecation/version plan</td><td>Plugin owner; ADR acceptance if public architecture changes, plus API approval by tech lead + independent reviewer</td></tr>
                     <tr><td>P3.3</td><td>Fine-grained UI/LSP contract: UI contribution is separate from editor-state reads; bounded LSP API; content needs explicit read grant; all capabilities scoped to workspace trust</td><td>Plugin/security owners; phase lead + independent security reviewer</td></tr>
                   </tbody></table></div>
@@ -295,7 +297,7 @@
                 <summary>Phase 4 — gates, protocol, and acceptance</summary>
                 <div class="details-body">
                   <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
-                    <tr><td>P4.1</td><td>Client/agent OS-version compatibility and release matrix</td><td>Remote owner; phase lead + reviewer</td></tr>
+                    <tr><td>P4.1</td><td>Client/agent OS-version compatibility and release matrix</td><td>Remote owner; phase lead + independent reviewer</td></tr>
                     <tr><td>P4.2</td><td>ADR for SSH bootstrap/auth, install/update, token lifetime/rotation/revocation, agent integrity</td><td>Remote/security owners; ADR rule + security reviewer</td></tr>
                     <tr><td>P4.3</td><td>Latency/network profile: hardware/OS, bandwidth/RTT/loss, workload, warmup, samples, aggregation, tool, pass rule</td><td>Performance owner; phase lead + independent performance reviewer</td></tr>
                     <tr><td>P4.4</td><td>ADR for ACK/durability, per-path ordering, version-vector conflicts, idempotent replay</td><td>Core/remote owners; ADR rule</td></tr>
@@ -337,7 +339,7 @@
               <details open>
                 <summary>Phase 5 — release prerequisites and blockers</summary>
                 <div class="details-body">
-                  <p><strong>P5.1 entry gate:</strong> approve hardware/OS, release build, cold/warm definitions, warmup, samples, aggregation, regressions, waivers, external-user rule, and immutable fixture manifests/hashes. The 1 GiB manifest fixes encoding, newline, line-length distribution/max, content mix, syntax mode; the repo manifest fixes files, commits, tracked/untracked/modified counts and cache state; the crash contract fixes the session formula/window. Owners: release/performance; approval: tech lead + performance reviewer, plus privacy/security for crash/external data.</p>
+                  <p><strong>P5.1 entry gate:</strong> approve hardware/OS, release build, cold/warm definitions, warmup, samples, aggregation, regressions, waivers, external-user rule, and immutable fixture manifests/hashes. The 1 GiB manifest fixes encoding, newline, line-length distribution/max, content mix, syntax mode; the repo manifest fixes files, commits, tracked/untracked/modified counts and cache state; the crash contract fixes the session formula/window. Owners: release/performance; approval: tech lead + independent performance reviewer, plus privacy/security for crash/external data.</p>
                   <h4>Required packaging</h4>
                   <div class="table-wrap"><table><thead><tr><th>Platform</th><th>Required</th></tr></thead><tbody>
                     <tr><td>Windows</td><td>Portable <code>.exe</code>, <code>.msi</code>, winget</td></tr>
@@ -449,16 +451,17 @@
 
           <section>
             <h2 id="reviews">Review record</h2>
-            <p>No durable external review artifact is recorded. Prior AI review output is an internal check, not approval evidence. This revision is <code>READY FOR REVIEW</code>; inspectable independent records are required before any <code>AGREE</code>.</p>
+            <p>No qualifying durable review artifact is recorded. Prior AI review output without an inspectable artifact that identifies the reviewer principal, verdict, reviewed commit, and review scope, or without distinct-agent proof, is an internal quality check rather than approval evidence. This revision is <code>READY FOR REVIEW</code>; eligible reviewers must independently inspect both files before any <code>AGREE</code>.</p>
             <article>
               <h3 id="overall-review">Overall plan gate</h3>
-              <div class="table-wrap"><table><thead><tr><th>Reviewer</th><th>Markdown</th><th>HTML</th><th>Final</th></tr></thead><tbody>
-                <tr><td>Reviewer 1 — unassigned</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
-                <tr><td>Reviewer 2 — unassigned</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+              <div class="table-wrap"><table><thead><tr><th>Slot</th><th>Reviewer principal</th><th>Markdown</th><th>HTML</th><th>UTC date</th><th>Reviewed commit</th><th>Artifact</th><th>Final</th></tr></thead><tbody>
+                <tr><td>Reviewer 1</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+                <tr><td>Reviewer 2</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
               </tbody></table></div>
             </article>
             <article>
               <h3 id="detailed-review">Detailed plan gate</h3>
+              <p><code>Reviewer 1</code> and <code>Reviewer 2</code> refer to the principals, reviewed commit, and artifacts in the overall gate. A detailed verdict is invalid when that binding is missing or violates the distinct-agent rule.</p>
               <div class="table-wrap"><table><thead><tr><th>Reviewer / format</th><th>Phase 0</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th><th>Phase 4</th><th>Phase 5</th><th>Phase 6+</th></tr></thead><tbody>
                 <tr><td>Reviewer 1 / Markdown</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
                 <tr><td>Reviewer 1 / HTML</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
@@ -476,12 +479,12 @@
               <li>☑ Phase 1 preserves dirty/save failure, one-batch→one-undo, and unsupported motions.</li>
               <li>☑ Phase 2 preserves “fully navigable” and “crash restore loses no acknowledged edit”.</li>
               <li>☑ Assets resolve; IDs and summaries are unique; tags balance; keyboard/sidebar controls are accessible.</li>
-              <li>☑ JavaScript syntax, stable-ID, whitespace, and diff checks pass; only these two plan files changed for the task.</li>
-              <li>☐ Two independent reviewers attach inspectable records for both formats and Phase 0–5 plus the Phase 6+ umbrella before final status.</li>
+              <li>☑ JavaScript syntax, stable-ID, whitespace, and diff checks pass; no runtime source, dependency, or public API changed, and the policy amendment is mirrored in Architecture, AGENTS, ADRs, Phase 0 artifacts, and both plan formats.</li>
+              <li>☐ Two independent reviewers attach inspectable records for both formats and Phase 0–5 plus the Phase 6+ umbrella before final status; AI reviewers must satisfy the distinct-agent rule.</li>
             </ul>
           </section>
 
-          <footer class="doc-footer"><p><strong>NVide Implementation Plan</strong> · canonical Markdown parity view · Architecture v0.2.0</p></footer>
+          <footer class="doc-footer"><p><strong>NVide Implementation Plan</strong> · canonical Markdown parity view · Architecture v0.2.1</p></footer>
         </main>
       </div>
     </div>

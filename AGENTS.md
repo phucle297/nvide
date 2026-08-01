@@ -192,6 +192,14 @@ ask whether a new ADR should be created.
 
 ---
 
+# Review Independence
+
+Human and AI agents may fill reviewer roles. An AI review counts only when the reviewer uses a different orchestrator-issued canonical agent identity from every agent that authored or implemented the reviewed change. Starting another turn with the same agent does not create an independent reviewer.
+
+Record principals as `human:<handle>` or `agent:<canonical-task-id>`. Every required reviewer principal must be unique and must differ from every author or implementer principal. The review artifact must identify the same principal, verdict, reviewed commit, and scope. An agent must never approve its own work or fill multiple required reviewer slots.
+
+---
+
 # Repository Respect
 
 Prefer consistency over personal preference.
@@ -377,6 +385,7 @@ Do not add expensive benchmarks unless requested.
 # Proposed Phase 0 Rust Coding Standards
 
 Status: P0.1 REVIEW PENDING. This section is a proposal, not approval evidence.
+Prepared-by principals: `agent:/root`
 
 - Use Rust 2021 and stable Rust for product code, with workspace `rust-version = "1.82"`. Product code uses no nightly features; the ADR-0018 fuzz job may use a separately pinned nightly toolchain only to run `cargo-fuzz`.
 - Keep dependency versions and workspace lints in the root manifest. Commit `Cargo.lock`; build and test with `--locked` in CI.
@@ -388,6 +397,11 @@ Status: P0.1 REVIEW PENDING. This section is a proposal, not approval evidence.
 - Generated code is committed only when an approved generation policy names its source and check command. Never hand-edit generated output.
 - Crate dependency direction follows ADR-0011 and is CI-enforced. A dependency-cycle or forbidden edge is a build failure.
 - Formatting or refactoring unrelated files is out of scope.
+
+| Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
+| --- | --- | --- | --- | --- | --- |
+| Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
 
 ---
 

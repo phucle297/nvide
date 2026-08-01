@@ -3,6 +3,7 @@
 - Status: Proposed
 - Date: 2026-07-31
 - Extends: ADR-0002, ADR-0015, ADR-0017
+- Prepared-by principals: `agent:/root`
 
 ## Context
 
@@ -73,7 +74,7 @@ Bounded queues and requests cap per-connection memory. Stream IDs and schema chu
 
 ## Approval record
 
-| Role | Reviewer | Verdict | UTC date | Reviewed commit | Artifact |
+| Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
 | Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
 | Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |

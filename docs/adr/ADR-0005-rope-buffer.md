@@ -2,10 +2,11 @@
 
 - Status: Accepted
 - Catalog source: Architecture v0.2.0
-- Acceptance record attachment: PENDING
+- Acceptance revalidation: PENDING
+- Prepared-by principals: `agent:/root`
 - Date: 2026-07-31
 
-This file records the accepted catalog decision. Its presence is not P0.1 approval evidence until the tech lead and one reviewer attach an inspectable review record.
+This file records the accepted catalog decision. Its presence is not P0.1 approval evidence until the tech lead and one independent reviewer complete the record below.
 
 ## Context
 
@@ -54,3 +55,10 @@ Core code uses the `Buffer` trait. A piece-table backend for small scratch buffe
 ## Scalability
 
 Rope operations and the line-start index are intended to remain responsive for large files. The abstraction permits a later storage replacement while keeping Phase 0 callers stable.
+
+## Approval record
+
+| Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
+| --- | --- | --- | --- | --- | --- |
+| Tech lead | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Independent reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
