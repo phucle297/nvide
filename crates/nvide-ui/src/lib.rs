@@ -26,6 +26,7 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
 const MAX_RESTARTS: usize = 3;
 const EDIT_STABILIZATION: Duration = Duration::from_secs(1);
+const EDIT_FINALIZER_DELAY: Duration = Duration::from_millis(10);
 const EDIT_SENTINELS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 #[derive(Debug)]
@@ -282,6 +283,12 @@ impl App {
     fn handle_benchmark_action(&mut self, event_loop: &ActiveEventLoop, action: BenchmarkAction) {
         match action {
             BenchmarkAction::Continue => {
+                if let Some(window) = self.window.as_ref() {
+                    window.request_redraw();
+                }
+            }
+            BenchmarkAction::FinalizeDisplay => {
+                std::thread::sleep(EDIT_FINALIZER_DELAY);
                 if let Some(window) = self.window.as_ref() {
                     window.request_redraw();
                 }
@@ -578,6 +585,7 @@ struct Trace {
 #[derive(Clone, Copy)]
 enum BenchmarkAction {
     Continue,
+    FinalizeDisplay,
     AwaitDisplay,
     DispatchEdit,
     Finish,
@@ -715,7 +723,7 @@ impl Benchmark {
                 if *unbound {
                     finish_edit(pending, traces, *dispatched, *warmup_edits + *measure_edits)
                 } else {
-                    BenchmarkAction::Continue
+                    BenchmarkAction::FinalizeDisplay
                 }
             }
         }
@@ -1541,7 +1549,7 @@ mod tests {
                     rgba: vec![1, 2, 3, 4, 9, 8, 7, 6],
                 }),
             }),
-            BenchmarkAction::Continue
+            BenchmarkAction::FinalizeDisplay
         ));
         assert!(benchmark.display_acknowledged()?.is_none());
         assert_eq!(
