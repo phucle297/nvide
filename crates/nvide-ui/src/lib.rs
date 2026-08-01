@@ -6,7 +6,7 @@ use std::{
     env,
     error::Error,
     fmt, fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -25,6 +25,7 @@ use winit::{
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
 const MAX_RESTARTS: usize = 3;
+const EDIT_STABILIZATION: Duration = Duration::from_secs(1);
 const EDIT_SENTINELS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 #[derive(Debug)]
@@ -280,11 +281,7 @@ impl App {
                     window.request_redraw();
                 }
             }
-            BenchmarkAction::AwaitDisplay => {
-                if let Some(window) = self.window.as_ref() {
-                    window.request_redraw();
-                }
-            }
+            BenchmarkAction::AwaitDisplay => {}
             BenchmarkAction::DispatchEdit => {
                 self.dispatch_benchmark_edit(event_loop);
                 if let Some(window) = self.window.as_ref() {
@@ -568,6 +565,7 @@ struct Trace {
     present_ns: Option<u64>,
     displayed_ns: Option<u64>,
     sentinel_pixels: bool,
+    request_published: bool,
     readback: Option<nvide_render::FrameReadback>,
 }
 
@@ -651,6 +649,7 @@ impl Benchmark {
                 }
             }
             Self::Edit {
+                started,
                 warmup_edits,
                 measure_edits,
                 dispatched,
@@ -662,6 +661,11 @@ impl Benchmark {
                 ..
             } => {
                 if pending.is_none() {
+                    if *dispatched == 0
+                        && started.is_some_and(|start| start.elapsed() < EDIT_STABILIZATION)
+                    {
+                        return BenchmarkAction::Continue;
+                    }
                     return if *dispatched < *warmup_edits + *measure_edits {
                         BenchmarkAction::DispatchEdit
                     } else {
@@ -697,7 +701,7 @@ impl Benchmark {
                 if *unbound {
                     finish_edit(pending, traces, *dispatched, *warmup_edits + *measure_edits)
                 } else {
-                    BenchmarkAction::AwaitDisplay
+                    BenchmarkAction::Continue
                 }
             }
         }
@@ -742,6 +746,7 @@ impl Benchmark {
                 present_ns: None,
                 displayed_ns: None,
                 sentinel_pixels: false,
+                request_published: false,
                 readback: None,
             }));
         }
@@ -819,6 +824,9 @@ impl Benchmark {
         else {
             return Ok(None);
         };
+        if let Some(trace) = pending.as_mut() {
+            publish_display_request(output, trace)?;
+        }
         let acknowledgements = match fs::read_to_string(output.join("displayed-ack.csv")) {
             Ok(contents) => contents,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -976,6 +984,32 @@ impl Benchmark {
         fs::write(output_directory.join("runtime.csv"), runtime).map_err(display_error)?;
         Ok(())
     }
+}
+
+fn publish_display_request(output: &Path, trace: &mut Trace) -> Result<(), UiError> {
+    if trace.request_published {
+        return Ok(());
+    }
+    let (Some(sequence), Some(present_ns)) = (trace.frame_sequence, trace.present_ns) else {
+        return Ok(());
+    };
+    let destination = output.join(format!("displayed-request-{sequence}.csv"));
+    let temporary = output.join(format!(
+        ".displayed-request-{}-{sequence}.tmp",
+        std::process::id()
+    ));
+    fs::write(
+        &temporary,
+        format!(
+            "pid,trace_id,frame_sequence,present_ns\n{},{},{sequence},{present_ns}\n",
+            std::process::id(),
+            trace.trace_id
+        ),
+    )
+    .map_err(display_error)?;
+    fs::rename(temporary, destination).map_err(display_error)?;
+    trace.request_published = true;
+    Ok(())
 }
 
 fn finish_edit(
@@ -1486,7 +1520,7 @@ mod tests {
                     rgba: vec![1, 2, 3, 4, 9, 8, 7, 6],
                 }),
             }),
-            BenchmarkAction::AwaitDisplay
+            BenchmarkAction::Continue
         ));
         assert!(matches!(
             benchmark.presented(nvide_render::PresentedFrame {
@@ -1507,6 +1541,13 @@ mod tests {
             );
         }
         assert!(benchmark.display_acknowledged()?.is_none());
+        assert_eq!(
+            fs::read_to_string(output.join("displayed-request-2.csv")).map_err(display_error)?,
+            format!(
+                "pid,trace_id,frame_sequence,present_ns\n{},1,2,100\n",
+                std::process::id()
+            )
+        );
         fs::write(
             output.join("displayed-ack.csv"),
             format!(
