@@ -1,6 +1,6 @@
 # P0.2 native presentation binding candidate
 
-- Status: READY FOR EXIT-BINDING REVIEW; NOT P0-E6 EVIDENCE
+- Status: EXIT BINDING APPROVED; NOT P0-E6 EVIDENCE
 - Candidate implementation commit: `e34dc0f279a57b2bd67c5eacebcb5fb68115606e`
 - Owner: Performance owner
 - Prepared by: `agent:/root`
@@ -76,5 +76,5 @@ PY
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| Phase lead | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Performance reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Phase lead | `agent:/root/p02_exit_binding_lead` | AGREE | 2026-08-01 | `19c93f24d346036c09e233dcb9761fbeda7175fb` | [`19c93f2-p02-exit-binding-phase-lead.md`](../reviews/19c93f2-p02-exit-binding-phase-lead.md) |
+| Performance reviewer | `agent:/root/p02_exit_binding_performance` | AGREE | 2026-08-01 | `19c93f24d346036c09e233dcb9761fbeda7175fb` | [`19c93f2-p02-exit-binding-performance.md`](../reviews/19c93f2-p02-exit-binding-performance.md) |
