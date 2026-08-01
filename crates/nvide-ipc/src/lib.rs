@@ -70,10 +70,11 @@ impl Frame {
                 maximum: MAX_PAYLOAD,
             });
         }
-        writer.write_all(&length.to_le_bytes())?;
-        writer.write_all(&self.stream_id.to_le_bytes())?;
-        writer.write_all(&self.flags.to_le_bytes())?;
-        writer.write_all(&self.payload)?;
+        let deadline = Instant::now() + QUEUE_WAIT;
+        write_all_before(&mut writer, &length.to_le_bytes(), deadline)?;
+        write_all_before(&mut writer, &self.stream_id.to_le_bytes(), deadline)?;
+        write_all_before(&mut writer, &self.flags.to_le_bytes(), deadline)?;
+        write_all_before(&mut writer, &self.payload, deadline)?;
         Ok(())
     }
 
@@ -146,14 +147,20 @@ impl From<schema::SchemaError> for ProtocolError {
 }
 
 pub fn read_frame(mut reader: impl Read, maximum: usize) -> Result<Option<Frame>, ProtocolError> {
+    read_frame_before(&mut reader, maximum, Instant::now() + QUEUE_WAIT)
+}
+
+fn read_frame_before(
+    reader: &mut impl Read,
+    maximum: usize,
+    deadline: Instant,
+) -> Result<Option<Frame>, ProtocolError> {
     let maximum = maximum.min(MAX_PAYLOAD);
     let mut header = [0_u8; HEADER_LEN];
-    match reader.read(&mut header[..1]) {
-        Ok(0) => return Ok(None),
-        Ok(_) => {}
-        Err(error) => return Err(error.into()),
+    if read_before(reader, &mut header[..1], deadline)? == 0 {
+        return Ok(None);
     }
-    read_exact_or_truncated(&mut reader, &mut header[1..])?;
+    read_exact_or_truncated(reader, &mut header[1..], deadline)?;
     let length = u32::from_le_bytes(
         header[0..4]
             .try_into()
@@ -173,18 +180,88 @@ pub fn read_frame(mut reader: impl Read, maximum: usize) -> Result<Option<Frame>
             .map_err(|_| ProtocolError::TruncatedFrame)?,
     );
     let mut payload = vec![0; length];
-    read_exact_or_truncated(&mut reader, &mut payload)?;
+    read_exact_or_truncated(reader, &mut payload, deadline)?;
     Ok(Some(Frame::new(stream_id, flags, payload)?))
 }
 
-fn read_exact_or_truncated(reader: &mut impl Read, bytes: &mut [u8]) -> Result<(), ProtocolError> {
-    reader.read_exact(bytes).map_err(|error| {
-        if error.kind() == io::ErrorKind::UnexpectedEof {
-            ProtocolError::TruncatedFrame
-        } else {
-            ProtocolError::Io(error)
+fn read_exact_or_truncated(
+    reader: &mut impl Read,
+    mut bytes: &mut [u8],
+    deadline: Instant,
+) -> Result<(), ProtocolError> {
+    while !bytes.is_empty() {
+        match read_before(reader, bytes, deadline)? {
+            0 => return Err(ProtocolError::TruncatedFrame),
+            read => bytes = &mut bytes[read..],
         }
-    })
+    }
+    Ok(())
+}
+
+fn read_before(
+    reader: &mut impl Read,
+    bytes: &mut [u8],
+    deadline: Instant,
+) -> Result<usize, ProtocolError> {
+    loop {
+        if Instant::now() >= deadline {
+            return Err(
+                io::Error::new(io::ErrorKind::TimedOut, "NRPC frame read timed out").into(),
+            );
+        }
+        match reader.read(bytes) {
+            Ok(read) if Instant::now() < deadline => return Ok(read),
+            Ok(_) => {
+                return Err(
+                    io::Error::new(io::ErrorKind::TimedOut, "NRPC frame read timed out").into(),
+                )
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                ) =>
+            {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
+
+fn write_all_before(
+    writer: &mut impl Write,
+    mut bytes: &[u8],
+    deadline: Instant,
+) -> Result<(), ProtocolError> {
+    while !bytes.is_empty() {
+        if Instant::now() >= deadline {
+            return Err(
+                io::Error::new(io::ErrorKind::TimedOut, "NRPC frame write timed out").into(),
+            );
+        }
+        match writer.write(bytes) {
+            Ok(0) => std::thread::sleep(Duration::from_millis(1)),
+            Ok(written) if Instant::now() < deadline => bytes = &bytes[written..],
+            Ok(_) => {
+                return Err(
+                    io::Error::new(io::ErrorKind::TimedOut, "NRPC frame write timed out").into(),
+                )
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                ) =>
+            {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
 }
 
 fn validate_flags(flags: u16, payload: &[u8]) -> Result<(), ProtocolError> {
@@ -725,6 +802,35 @@ where
 mod tests {
     use super::*;
 
+    struct SlowReader {
+        bytes: Vec<u8>,
+        offset: usize,
+    }
+
+    impl Read for SlowReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            std::thread::sleep(Duration::from_millis(8));
+            if self.offset >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            output[0] = self.bytes[self.offset];
+            self.offset += 1;
+            Ok(1)
+        }
+    }
+
+    struct StalledWriter;
+
+    impl Write for StalledWriter {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::WouldBlock, "stalled"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn frame_codec_rejects_bad_input() -> Result<(), ProtocolError> {
         let frame = Frame::new(3, REQ, b"hello".to_vec())?;
@@ -754,6 +860,36 @@ mod tests {
         assert!(matches!(
             Frame::new(1, COMPRESSED | REQ, Vec::new()),
             Err(ProtocolError::CompressionUnsupported)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn frame_deadlines_cover_the_aggregate_operation() -> Result<(), ProtocolError> {
+        let frame = Frame::new(1, REQ, b"slow".to_vec())?;
+        let mut reader = SlowReader {
+            bytes: frame.encoded()?,
+            offset: 0,
+        };
+        let started = Instant::now();
+        assert!(matches!(
+            read_frame_before(
+                &mut reader,
+                MAX_PAYLOAD,
+                Instant::now() + Duration::from_millis(20)
+            ),
+            Err(ProtocolError::Io(ref error)) if error.kind() == io::ErrorKind::TimedOut
+        ));
+        assert!(started.elapsed() < Duration::from_millis(100));
+
+        let mut writer = StalledWriter;
+        assert!(matches!(
+            write_all_before(
+                &mut writer,
+                b"frame",
+                Instant::now() + Duration::from_millis(20)
+            ),
+            Err(ProtocolError::Io(ref error)) if error.kind() == io::ErrorKind::TimedOut
         ));
         Ok(())
     }

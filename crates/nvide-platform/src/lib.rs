@@ -68,9 +68,7 @@ mod local {
         }
 
         fn new(stream: UnixStream) -> io::Result<Self> {
-            let timeout = Some(Duration::from_secs(5));
-            stream.set_read_timeout(timeout)?;
-            stream.set_write_timeout(timeout)?;
+            stream.set_nonblocking(true)?;
             Ok(Self(stream))
         }
     }
@@ -271,24 +269,14 @@ mod local {
 
     impl Read for LocalStream {
         fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-            let deadline = Instant::now() + Duration::from_secs(5);
-            loop {
-                match self.0.read(bytes) {
-                    Ok(read) => return Ok(read),
-                    Err(error) if error.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) => {
-                        return Ok(0)
-                    }
-                    Err(error) if is_pending(&error) => {
-                        if Instant::now() >= deadline {
-                            return Err(io::Error::new(
-                                io::ErrorKind::TimedOut,
-                                "local named-pipe read timed out",
-                            ));
-                        }
-                        std::thread::sleep(Duration::from_millis(10));
-                    }
-                    Err(error) => return Err(error),
-                }
+            match self.0.read(bytes) {
+                Ok(read) => Ok(read),
+                Err(error) if error.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) => Ok(0),
+                Err(error) if is_pending(&error) => Err(io::Error::new(
+                    io::ErrorKind::WouldBlock,
+                    "local named-pipe read would block",
+                )),
+                Err(error) => Err(error),
             }
         }
     }
@@ -298,21 +286,17 @@ mod local {
             if bytes.is_empty() {
                 return Ok(0);
             }
-            let deadline = Instant::now() + Duration::from_secs(5);
-            loop {
-                match self.0.write(bytes) {
-                    Ok(0) => {}
-                    Ok(written) => return Ok(written),
-                    Err(error) if is_pending(&error) => {}
-                    Err(error) => return Err(error),
-                }
-                if Instant::now() >= deadline {
-                    return Err(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        "local named-pipe write timed out",
-                    ));
-                }
-                std::thread::sleep(Duration::from_millis(10));
+            match self.0.write(bytes) {
+                Ok(0) => Err(io::Error::new(
+                    io::ErrorKind::WouldBlock,
+                    "local named-pipe write would block",
+                )),
+                Ok(written) => Ok(written),
+                Err(error) if is_pending(&error) => Err(io::Error::new(
+                    io::ErrorKind::WouldBlock,
+                    "local named-pipe write would block",
+                )),
+                Err(error) => Err(error),
             }
         }
 
@@ -353,7 +337,9 @@ pub use local::{monotonic_ns, LocalListener, LocalStream};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Read, Write};
+    use std::io::Read;
+    #[cfg(unix)]
+    use std::io::Write;
 
     #[cfg(unix)]
     #[test]
@@ -368,41 +354,23 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn named_pipe_read_times_out() -> std::io::Result<()> {
-        let endpoint = format!("nvide-platform-read-timeout-{}", std::process::id());
+    fn named_pipe_read_is_nonblocking() -> std::io::Result<()> {
+        let endpoint = format!("nvide-platform-nonblocking-{}", std::process::id());
         let listener = LocalListener::bind(&endpoint)?;
         let reader = std::thread::spawn(move || -> std::io::Result<()> {
             let mut stream = listener.accept()?;
             let mut byte = [0];
-            let error = stream.read(&mut byte).expect_err("idle read must time out");
-            assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+            let error = match stream.read(&mut byte) {
+                Err(error) => error,
+                Ok(_) => return Err(std::io::Error::other("idle read blocked or returned data")),
+            };
+            assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
             Ok(())
         });
         let _client = LocalStream::connect(&endpoint)?;
         reader
             .join()
             .map_err(|_| std::io::Error::other("reader thread panicked"))??;
-        Ok(())
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn named_pipe_write_times_out() -> std::io::Result<()> {
-        let endpoint = format!("nvide-platform-write-timeout-{}", std::process::id());
-        let listener = LocalListener::bind(&endpoint)?;
-        let idle = std::thread::spawn(move || -> std::io::Result<()> {
-            let _stream = listener.accept()?;
-            std::thread::sleep(std::time::Duration::from_secs(6));
-            Ok(())
-        });
-        let mut client = LocalStream::connect(&endpoint)?;
-        let payload = vec![0; 1024 * 1024];
-        let error = client
-            .write_all(&payload)
-            .expect_err("stalled write must time out");
-        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
-        idle.join()
-            .map_err(|_| std::io::Error::other("writer thread panicked"))??;
         Ok(())
     }
 }

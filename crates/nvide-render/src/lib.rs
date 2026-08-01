@@ -10,6 +10,7 @@ use std::{
     sync::{mpsc, Arc, Mutex},
     task::{Context, Poll, Wake, Waker},
     thread,
+    time::{Duration, Instant},
 };
 use wgpu::util::DeviceExt;
 
@@ -91,6 +92,7 @@ pub struct Renderer {
     shaping: ShapingBuffer,
     swash_cache: SwashCache,
     text: String,
+    benchmark_marker: Option<u64>,
     glyph_count: usize,
     frame_sequence: u64,
     readback_supported: bool,
@@ -299,6 +301,7 @@ impl Renderer {
             shaping,
             swash_cache: SwashCache::new(),
             text: String::new(),
+            benchmark_marker: None,
             glyph_count: 0,
             frame_sequence: 0,
             readback_supported,
@@ -310,13 +313,30 @@ impl Renderer {
         self.config.width = width.max(1);
         self.config.height = height.max(1);
         self.surface.configure(&self.device, &self.config);
-        let text = self.text.clone();
-        self.set_text(&text)
+        let text = match self.benchmark_marker {
+            Some(sequence) => format!("{}\nframe:{sequence}", self.text),
+            None => self.text.clone(),
+        };
+        self.shape(&text)
     }
 
     pub fn set_text(&mut self, text: &str) -> Result<(), RenderError> {
         self.text.clear();
         self.text.push_str(text);
+        self.benchmark_marker = None;
+        self.shape(text)
+    }
+
+    pub fn set_benchmark_text(&mut self, text: &str) -> Result<u64, RenderError> {
+        self.text.clear();
+        self.text.push_str(text);
+        let sequence = self.frame_sequence.saturating_add(1);
+        self.benchmark_marker = Some(sequence);
+        self.shape(&format!("{text}\nframe:{sequence}"))?;
+        Ok(sequence)
+    }
+
+    fn shape(&mut self, text: &str) -> Result<(), RenderError> {
         self.shaping.set_size(
             &mut self.font_system,
             Some(self.config.width as f32),
@@ -377,9 +397,12 @@ impl Renderer {
         self.glyph_count
     }
 
-    pub fn render(&mut self, capture: bool) -> Result<PresentedFrame, RenderError> {
+    pub fn render(
+        &mut self,
+        capture_timeout: Option<Duration>,
+    ) -> Result<PresentedFrame, RenderError> {
         self.check_device()?;
-        if capture && !self.readback_supported {
+        if capture_timeout.is_some() && !self.readback_supported {
             return Err(RenderError::ReadbackUnsupported);
         }
         let frame = match self.surface.get_current_texture() {
@@ -426,18 +449,15 @@ impl Renderer {
                 pass.draw_indexed(0..self.index_count, 0, 0..1);
             }
         }
-        let readback = if capture {
-            Some(self.encode_readback(&mut encoder, &frame.texture))
-        } else {
-            None
-        };
+        let readback = capture_timeout
+            .map(|timeout| (self.encode_readback(&mut encoder, &frame.texture), timeout));
         self.queue.submit([encoder.finish()]);
         frame.present();
         let present_ns = nvide_platform::monotonic_ns()
             .map_err(|error| RenderError::Timestamp(error.to_string()))?;
         self.frame_sequence = self.frame_sequence.saturating_add(1);
         let readback = readback
-            .map(|pending| self.finish_readback(pending))
+            .map(|(pending, timeout)| self.finish_readback(pending, timeout))
             .transpose()?;
         self.check_device()?;
         Ok(PresentedFrame {
@@ -504,17 +524,37 @@ impl Renderer {
         }
     }
 
-    fn finish_readback(&self, pending: PendingReadback) -> Result<FrameReadback, RenderError> {
+    fn finish_readback(
+        &self,
+        pending: PendingReadback,
+        timeout: Duration,
+    ) -> Result<FrameReadback, RenderError> {
         let slice = pending.buffer.slice(..);
         let (sender, receiver) = mpsc::channel();
         slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = sender.send(result);
         });
-        self.device.poll(wgpu::Maintain::Wait);
-        receiver
-            .recv()
-            .map_err(|error| RenderError::Readback(error.to_string()))?
-            .map_err(|error| RenderError::Readback(error.to_string()))?;
+        let deadline = Instant::now() + timeout;
+        let mapped = loop {
+            self.device.poll(wgpu::Maintain::Poll);
+            match receiver.try_recv() {
+                Ok(result) => break result,
+                Err(mpsc::TryRecvError::Empty) if Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(1));
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    return Err(RenderError::Readback(
+                        "mapping exceeded the trace deadline".to_owned(),
+                    ))
+                }
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    return Err(RenderError::Readback(
+                        "mapping callback disconnected".to_owned(),
+                    ))
+                }
+            }
+        };
+        mapped.map_err(|error| RenderError::Readback(error.to_string()))?;
         let mapped = slice.get_mapped_range();
         let mut rgba = Vec::with_capacity((pending.row_bytes * pending.height) as usize);
         for row in mapped.chunks_exact(pending.padded_row_bytes as usize) {
