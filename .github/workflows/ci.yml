@@ -34,27 +34,7 @@ jobs:
           targets: ${{ matrix.target }}
       - run: cargo +1.82.0 check --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
       - run: cargo +stable build --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
-      - name: Test workspace
-        shell: bash
-        run: |
-          python3 - '${{ matrix.target }}' <<'PY'
-          import subprocess, sys
-
-          command = [
-              "cargo", "+stable", "test", "--workspace", "--all-targets",
-              "--all-features", "--locked", "--target", sys.argv[1],
-          ]
-          result = subprocess.run(
-              command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-              text=True, errors="replace",
-          )
-          print(result.stdout, end="")
-          if result.returncode:
-              detail = result.stdout[-12_000:]
-              detail = detail.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-              print(f"::error title=Native test failure::{detail}")
-          raise SystemExit(result.returncode)
-          PY
+      - run: cargo +stable test --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
       - run: cargo +stable clippy --workspace --all-targets --all-features --locked --target ${{ matrix.target }} -- -D warnings
 
   policy:
