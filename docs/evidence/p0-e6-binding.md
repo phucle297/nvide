@@ -1,6 +1,6 @@
 # P0.2 native presentation binding revalidation candidate
 
-- Status: EXIT BINDING REVALIDATION REVIEW PENDING; NOT P0-E6 EVIDENCE
+- Status: EXIT BINDING REVALIDATION APPROVED; NOT P0-E6 EVIDENCE
 - Candidate implementation commit: `6c4542eefe14d3d3f9aad28ea3e847c827654023`
 - Owner: Performance owner
 - Prepared by: `agent:/root`
@@ -103,5 +103,5 @@ The clear natural-authority amendment changes the harness hash after these verdi
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| Phase lead | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Performance reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Phase lead | `agent:/root/p02_exit_binding_lead` | AGREE | 2026-08-01 | `d65d2245fd1390ea67b5c771c3e99ac7b569ebc0` | [`d65d224-p02-natural-rebinding-phase-lead.md`](../reviews/d65d224-p02-natural-rebinding-phase-lead.md) |
+| Performance reviewer | `agent:/root/p02_exit_binding_performance` | AGREE | 2026-08-01 | `d65d2245fd1390ea67b5c771c3e99ac7b569ebc0` | [`d65d224-p02-natural-rebinding-performance.md`](../reviews/d65d224-p02-natural-rebinding-performance.md) |
