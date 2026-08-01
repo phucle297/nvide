@@ -285,8 +285,27 @@ public static class Phase0Native {
     public static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool MoveFileExW(string existingName, string newName, uint flags);
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter,
+        int x, int y, int width, int height, uint flags);
 }
 "@
+
+function Set-BenchmarkWindowTopmost([Diagnostics.Process]$Process) {
+    $wait = [Diagnostics.Stopwatch]::StartNew()
+    while ($wait.ElapsedMilliseconds -lt 5000) {
+        if ($Process.HasExited) { throw "NVide exited before its benchmark window appeared" }
+        $Process.Refresh()
+        if ($Process.MainWindowHandle -ne [IntPtr]::Zero) {
+            if (![Phase0Native]::SetWindowPos($Process.MainWindowHandle, [IntPtr](-1), 0, 0, 0, 0, 0x00000053)) {
+                throw "SetWindowPos failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+            }
+            return
+        }
+        Start-Sleep -Milliseconds 50
+    }
+    throw "NVide benchmark window did not appear within five seconds"
+}
 
 function Quote-Argument([string]$Value) {
     return '"' + $Value.Replace('"', '\"') + '"'
@@ -371,6 +390,7 @@ try {
     $resumed = $true
     [void][Phase0Native]::CloseHandle($processInfo.hThread)
     $processInfo.hThread = [IntPtr]::Zero
+    Set-BenchmarkWindowTopmost $app
 
     $raw = New-Object IO.StreamWriter($rawPath, $false, $utf8)
     $headerSeen = $false
@@ -462,6 +482,7 @@ try {
         "presentmon_exit_code=$(if ($null -ne $presentMon -and $presentMon.HasExited) { $presentMon.ExitCode } else { '' })",
         "presentmon_stopped_after_application_exit=$stoppedAfterApplicationExit",
         "presentmon_post_exit_drain_ms=$postExitDrainMilliseconds",
+        "nvide_window_topmost=True",
         "resolution=$($display.CurrentHorizontalResolution)x$($display.CurrentVerticalResolution)",
         "configured_refresh_hz=$($display.CurrentRefreshRate)", "capture_utc=$([DateTime]::UtcNow.ToString('o'))"
     ) -join "`n"
