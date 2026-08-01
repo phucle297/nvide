@@ -1588,9 +1588,9 @@ mod tests {
         assert_eq!(supervisor.heartbeat(1), CoreHealth::Missed);
         assert_eq!(supervisor.heartbeat(2), CoreHealth::Missed);
         assert!(matches!(supervisor.heartbeat(3), CoreHealth::Unhealthy(_)));
-        supervisor.last_healthy -= Duration::from_secs(2);
+        assert!(matches!(supervisor.heartbeat(4), CoreHealth::Unhealthy(_)));
         assert!(matches!(
-            supervisor.heartbeat(4),
+            supervisor.heartbeat(5),
             CoreHealth::RestartRequired(_)
         ));
         Ok(())
