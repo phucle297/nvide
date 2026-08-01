@@ -1,6 +1,6 @@
 # P0.2 native presentation binding revalidation candidate
 
-- Status: EXIT BINDING REVALIDATION APPROVED; NOT P0-E6 EVIDENCE
+- Status: SUPERSEDED BY ATOMIC ACK AMENDMENT; REVALIDATION REQUIRED; NOT P0-E6 EVIDENCE
 - Candidate implementation commit: `3b68fbe7d7fcfcb8288899a37c3630112ea09612`
 - Owner: Performance owner
 - Prepared by: `agent:/root`
@@ -82,6 +82,8 @@ The amendment changed the harness hash after this approval, so these verdicts ar
 | Performance reviewer | `agent:/root/p02_exit_binding_performance` | AGREE | 2026-08-01 | `19c93f24d346036c09e233dcb9761fbeda7175fb` | [`19c93f2-p02-exit-binding-performance.md`](../reviews/19c93f2-p02-exit-binding-performance.md) |
 
 ## Exit-binding revalidation record
+
+The atomic-ACK amendment changes the approved harness hash, so these verdicts no longer authorize P0-E6 and are retained only as history.
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
