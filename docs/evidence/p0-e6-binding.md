@@ -1,6 +1,6 @@
 # P0.2 native presentation binding revalidation candidate
 
-- Status: EXIT BINDING REVALIDATION REVIEW PENDING; NOT P0-E6 EVIDENCE
+- Status: EXIT BINDING REVALIDATION APPROVED; NOT P0-E6 EVIDENCE
 - Candidate implementation commit: `3b68fbe7d7fcfcb8288899a37c3630112ea09612`
 - Owner: Performance owner
 - Prepared by: `agent:/root`
@@ -85,5 +85,5 @@ The amendment changed the harness hash after this approval, so these verdicts ar
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| Phase lead | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Performance reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Phase lead | `agent:/root/p02_exit_binding_lead` | AGREE | 2026-08-01 | `d44d8eb63bbe85345c9f92a638fbb8c9eddacf70` | [`d44d8eb-p02-rebinding-phase-lead.md`](../reviews/d44d8eb-p02-rebinding-phase-lead.md) |
+| Performance reviewer | `agent:/root/p02_exit_binding_performance` | AGREE | 2026-08-01 | `d44d8eb63bbe85345c9f92a638fbb8c9eddacf70` | [`d44d8eb-p02-rebinding-performance.md`](../reviews/d44d8eb-p02-rebinding-performance.md) |
