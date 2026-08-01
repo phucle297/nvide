@@ -35,7 +35,7 @@
               <div><dt>Status</dt><dd>REVIEWED — two independent approvals</dd></div>
               <div><dt>Last updated</dt><dd>2026-08-01</dd></div>
               <div><dt>Architecture</dt><dd>v0.2.1</dd></div>
-              <div><dt>Current phase</dt><dd>Phase 0</dd></div>
+              <div><dt>Current phase</dt><dd>Phase 0 complete; Phase 1 not entered</dd></div>
               <div><dt>Current target</dt><dd>MVP</dd></div>
               <div><dt>Canonical source</dt><dd><code>docs/plan/README.md</code></dd></div>
               <div><dt>Prepared by</dt><dd><code>agent:/root</code></dd></div>
@@ -102,7 +102,7 @@
             <article>
               <h3 id="phase-0">Phase 0 — Foundations &amp; Architecture Hardening</h3>
               <div class="card-grid">
-                <div class="card"><h4>Milestone</h4><p>MVP · current phase</p></div>
+                <div class="card"><h4>Milestone</h4><p>MVP · completed 2026-08-01</p></div>
                 <div class="card"><h4>Duration</h4><p>6–8 weeks</p></div>
                 <div class="card"><h4>Evidence</h4><p><code>docs/evidence/phase-0.md</code></p></div>
                 <div class="card"><h4>ADRs</h4><p>0001–0003, 0005, 0010–0013, 0015, 0017–0019</p></div>
@@ -111,7 +111,7 @@
                 <summary>Phase 0 — gates, scope, and acceptance</summary>
                 <div class="details-body">
                   <p><strong>Entry order:</strong> P0.1 and the P0.2 protocol block workspace implementation; P0.3 blocks schema work. P0.2 host/tool/calibration binding remains mandatory before P0-E6 and Phase 0 exit.</p>
-                  <p><strong>Gate status (2026-08-01):</strong> P0.1, the P0.2 protocol and exit binding, and P0.3 are <code>APPROVED</code>. P0-E1…P0-E5 are reviewed; the immutable P0-E6 workload is ready for final independent review. P0-E6 and Phase 0 exit remain pending those verdicts.</p>
+                  <p><strong>Gate status (2026-08-01):</strong> P0.1, P0.2, P0.3, and P0-E1…P0-E6 are <code>APPROVED</code>. Two eligible independent reviewers approved every evidence row and Phase 0 exit at commit <code>3f5fd0ba0cfd6ef2e0c8eb39808f5c27b29a28e4</code>. Phase 1 has not been entered and remains blocked on its own prerequisites.</p>
                   <div class="table-wrap"><table><thead><tr><th>ID</th><th>Prerequisite</th><th>Owner / approval</th></tr></thead><tbody>
                     <tr><td>P0.1</td><td>Canonical ADR-0002/0003/0005 records, coding standards, and ADR workflow matching v0.2.1</td><td>Tech lead; ADR rule and independent coding-standard review</td></tr>
                     <tr><td>P0.2</td><td>Benchmark/trace protocol: required hardware/OS/toolchain fields, release build, warmup, samples, tool semantics, aggregation, pass rule. “120 FPS clear” is actually presented steady-state frames for an empty no-workspace/no-plugin window at fixed resolution/vsync. The scripted UI↔core edit correlates dispatch → core version → viewport receipt → first presented glyph. The eligible native host, exact tool command, and calibration may be bound after implementation begins but before Phase 0 exit.</td><td>Performance owner; protocol by phase lead + independent performance reviewer before workspace; binding by the same roles before P0-E6/exit</td></tr>
@@ -119,13 +119,13 @@
                   </tbody></table></div>
                   <h4>Requirements</h4>
                   <ul>
-                    <li>☐ <strong>P0-R1:</strong> Create exactly <code>nvide</code>, <code>nvide-core</code>, <code>nvide-buffer</code>, <code>nvide-platform</code>, <code>nvide-ipc</code>, <code>nvide-rpc-schema</code>, <code>nvide-render</code>, and <code>nvide-ui</code>; no later crate scaffolding.</li>
-                    <li>☐ <strong>P0-R2:</strong> Enforce ADR-0011 direction and stable/MSRV CI on Windows x64, macOS x64, macOS arm64, and Linux x64.</li>
-                    <li>☐ <strong>P0-R3:</strong> Reproducible clean-checkout <code>xtask</code> schema generation.</li>
-                    <li>☐ <strong>P0-R4:</strong> Rope edits, line index/conversions, UTF-8 boundaries, branching undo, property/fuzz coverage.</li>
-                    <li>☐ <strong>P0-R5:</strong> NRPC framing/multiplexing, Unix sockets/Windows named pipes, schemas, and ADR-0015 major/minor handshake.</li>
-                    <li>☐ <strong>P0-R6:</strong> Minimum UI/core supervision proving ADR-0017 heartbeat, detection, restart budget, restart/rebind, and degradation.</li>
-                    <li>☐ <strong>P0-R7:</strong> Shaped text and input → NRPC → core rope edit → viewport snapshot → visible glyph update under P0.2.</li>
+                    <li>☑ <strong>P0-R1:</strong> Create exactly <code>nvide</code>, <code>nvide-core</code>, <code>nvide-buffer</code>, <code>nvide-platform</code>, <code>nvide-ipc</code>, <code>nvide-rpc-schema</code>, <code>nvide-render</code>, and <code>nvide-ui</code>; no later crate scaffolding.</li>
+                    <li>☑ <strong>P0-R2:</strong> Enforce ADR-0011 direction and stable/MSRV CI on Windows x64, macOS x64, macOS arm64, and Linux x64.</li>
+                    <li>☑ <strong>P0-R3:</strong> Reproducible clean-checkout <code>xtask</code> schema generation.</li>
+                    <li>☑ <strong>P0-R4:</strong> Rope edits, line index/conversions, UTF-8 boundaries, branching undo, property/fuzz coverage.</li>
+                    <li>☑ <strong>P0-R5:</strong> NRPC framing/multiplexing, Unix sockets/Windows named pipes, schemas, and ADR-0015 major/minor handshake.</li>
+                    <li>☑ <strong>P0-R6:</strong> Minimum UI/core supervision proving ADR-0017 heartbeat, detection, restart budget, restart/rebind, and degradation.</li>
+                    <li>☑ <strong>P0-R7:</strong> Shaped text and input → NRPC → core rope edit → viewport snapshot → visible glyph update under P0.2.</li>
                   </ul>
                   <h4>Ordered work and runnable acceptance</h4>
                   <ol>

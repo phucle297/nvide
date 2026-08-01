@@ -3,7 +3,7 @@
 Status: REVIEWED — two independent approvals
 Last updated: 2026-08-01
 Architecture baseline: `docs/architecture.html` v0.2.1
-Current implementation phase: Phase 0
+Current implementation phase: Phase 0 complete; Phase 1 not entered
 Current product target: MVP
 Prepared-by principals: `agent:/root`
 
@@ -55,7 +55,7 @@ MVP excludes WASM plugins, full DAP, WSL/Docker/Dev Containers, full Neovim comp
 
 ### Phase 0 — Foundations & Architecture Hardening
 
-**Context:** MVP · 6–8 weeks · no predecessor · current phase
+**Context:** MVP · 6–8 weeks · no predecessor · completed 2026-08-01
 **ADRs:** ADR-0001–ADR-0003, ADR-0005, ADR-0010–ADR-0013, ADR-0015, ADR-0017–ADR-0019
 **Evidence ledger:** `docs/evidence/phase-0.md` (created by Phase 0 implementation, not by this planning change)
 
@@ -63,7 +63,7 @@ MVP excludes WASM plugins, full DAP, WSL/Docker/Dev Containers, full Neovim comp
 
 The gates are ordered. Workspace implementation is blocked until P0.1 and the P0.2 protocol are approved. The P0.2 reference-host/tool/calibration binding remains mandatory before P0-E6 and Phase 0 exit.
 
-**Gate status (2026-08-01):** P0.1, the P0.2 protocol and exit binding, and P0.3 are `APPROVED`. P0-E1…P0-E5 are reviewed; the immutable P0-E6 workload is ready for final independent review. P0-E6 and Phase 0 exit remain pending those verdicts.
+**Gate status (2026-08-01):** P0.1, P0.2, P0.3, and P0-E1…P0-E6 are `APPROVED`. Two eligible independent reviewers approved every evidence row and Phase 0 exit at commit `3f5fd0ba0cfd6ef2e0c8eb39808f5c27b29a28e4`. Phase 1 has not been entered and remains blocked on its own prerequisites.
 
 | ID | Required decision or artifact | Owner | Approval | Blocks |
 | --- | --- | --- | --- | --- |
@@ -73,13 +73,13 @@ The gates are ordered. Workspace implementation is blocked until P0.1 and the P0
 
 #### Requirement checklist
 
-- [ ] **P0-R1:** Create exactly these Phase 0 crates: `nvide`, `nvide-core`, `nvide-buffer`, `nvide-platform`, `nvide-ipc`, `nvide-rpc-schema`, `nvide-render`, and `nvide-ui`; do not scaffold later-phase crates.
-- [ ] **P0-R2:** Enforce ADR-0011 dependency direction and stable Rust/MSRV checks on Windows x64, macOS x64, macOS arm64, and Linux x64.
-- [ ] **P0-R3:** Provide reproducible `xtask` schema generation from a clean checkout.
-- [ ] **P0-R4:** Implement rope edits, line index/conversions, UTF-8 boundaries, branching undo, and edit-sequence property/fuzz coverage.
-- [ ] **P0-R5:** Implement NRPC framing, multiplexing, local Unix-socket/Windows-named-pipe transport, generated schemas, and ADR-0015 major/minor handshake behavior.
-- [ ] **P0-R6:** Add the minimum UI/core supervision path needed to prove ADR-0017 heartbeat, failure detection, restart budget, restart/rebind, and user-visible degradation.
-- [ ] **P0-R7:** Render shaped text in `winit` + `wgpu`, then prove input → NRPC → core rope edit → viewport snapshot → visible glyph update under P0.2.
+- [x] **P0-R1:** Create exactly these Phase 0 crates: `nvide`, `nvide-core`, `nvide-buffer`, `nvide-platform`, `nvide-ipc`, `nvide-rpc-schema`, `nvide-render`, and `nvide-ui`; do not scaffold later-phase crates.
+- [x] **P0-R2:** Enforce ADR-0011 dependency direction and stable Rust/MSRV checks on Windows x64, macOS x64, macOS arm64, and Linux x64.
+- [x] **P0-R3:** Provide reproducible `xtask` schema generation from a clean checkout.
+- [x] **P0-R4:** Implement rope edits, line index/conversions, UTF-8 boundaries, branching undo, and edit-sequence property/fuzz coverage.
+- [x] **P0-R5:** Implement NRPC framing, multiplexing, local Unix-socket/Windows-named-pipe transport, generated schemas, and ADR-0015 major/minor handshake behavior.
+- [x] **P0-R6:** Add the minimum UI/core supervision path needed to prove ADR-0017 heartbeat, failure detection, restart budget, restart/rebind, and user-visible degradation.
+- [x] **P0-R7:** Render shaped text in `winit` + `wgpu`, then prove input → NRPC → core rope edit → viewport snapshot → visible glyph update under P0.2.
 
 #### Ordered work packages and runnable acceptance
 
