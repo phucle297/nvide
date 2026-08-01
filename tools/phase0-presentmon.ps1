@@ -1,24 +1,241 @@
+[CmdletBinding(DefaultParameterSetName = "Capture")]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "SelfTest")]
+    [switch]$SelfTest,
+    [Parameter(Mandatory = $true, ParameterSetName = "Capture")]
     [ValidateSet("clear", "edit")]
     [string]$Kind,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Capture")]
     [string]$RunId,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Capture")]
     [string]$Output,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Capture")]
     [string]$NvideExe,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Capture")]
     [string]$PresentMonExe,
+    [Parameter(ParameterSetName = "Capture")]
     [int]$WarmupSeconds = 10,
+    [Parameter(ParameterSetName = "Capture")]
     [int]$MeasureSeconds = 30,
+    [Parameter(ParameterSetName = "Capture")]
     [int]$WarmupEdits = 10,
+    [Parameter(ParameterSetName = "Capture")]
     [int]$MeasureEdits = 30,
+    [Parameter(ParameterSetName = "Capture")]
     [switch]$UnboundDiagnostic
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+$requestHeader = "pid,trace_id,frame_sequence,present_ns"
+$presentMonHeader = "Application,ProcessID,SwapChainAddress,Runtime,SyncInterval,PresentFlags,Dropped,TimeInSeconds,msInPresentAPI,msBetweenPresents,AllowsTearing,PresentMode,msUntilRenderComplete,msUntilDisplayed,msBetweenDisplayChange,msFlipDelay,msUntilRenderStart,msGPUActive,msSinceInput,QPCTime"
+
+function Parse-UInt32([string]$Value, [string]$Name) {
+    $parsed = [uint32]0
+    if (![uint32]::TryParse($Value, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$parsed)) {
+        throw "invalid decimal $Name"
+    }
+    return $parsed
+}
+
+function Parse-UInt64([string]$Value, [string]$Name) {
+    $parsed = [uint64]0
+    if (![uint64]::TryParse($Value, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$parsed)) {
+        throw "invalid decimal $Name"
+    }
+    return $parsed
+}
+
+function Parse-InvariantDouble([string]$Value, [string]$Name) {
+    $parsed = [double]0
+    if (![double]::TryParse($Value, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$parsed) -or [double]::IsNaN($parsed) -or [double]::IsInfinity($parsed)) {
+        throw "invalid $Name"
+    }
+    return $parsed
+}
+
+function Read-DisplayRequest([IO.FileInfo]$File, [uint32]$ExpectedPid) {
+    if ($File.Name -notmatch '^displayed-request-([1-9][0-9]*)\.csv$') {
+        throw "invalid display request filename: $($File.Name)"
+    }
+    $filenameSequence = Parse-UInt64 $Matches[1] "request filename sequence"
+    $lines = [IO.File]::ReadAllLines($File.FullName)
+    if ($lines.Count -ne 2 -or $lines[0] -cne $script:requestHeader) {
+        throw "invalid display request schema: $($File.Name)"
+    }
+    $fields = $lines[1].Split(',')
+    if ($fields.Count -ne 4) {
+        throw "invalid display request row: $($File.Name)"
+    }
+    $requestPid = Parse-UInt32 $fields[0] "request PID"
+    $traceId = Parse-UInt64 $fields[1] "request trace ID"
+    $sequence = Parse-UInt64 $fields[2] "request frame sequence"
+    $presentNanoseconds = Parse-UInt64 $fields[3] "request present timestamp"
+    if ($requestPid -ne $ExpectedPid -or $traceId -eq 0 -or $sequence -ne $filenameSequence -or $presentNanoseconds -eq 0) {
+        throw "display request identity mismatch: $($File.Name)"
+    }
+    return [pscustomobject]@{
+        File = $File.FullName
+        Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $File.FullName).Hash
+        TraceId = $traceId
+        Sequence = $sequence
+        PresentNanoseconds = $presentNanoseconds
+    }
+}
+
+function Register-DisplayRequest([object]$Request, [hashtable]$BySequence, [hashtable]$TraceIds) {
+    if ($BySequence.ContainsKey($Request.Sequence)) {
+        $existing = $BySequence[$Request.Sequence]
+        if ($existing.File -ne $Request.File -or $existing.Hash -ne $Request.Hash) {
+            throw "duplicate or changed display request sequence: $($Request.Sequence)"
+        }
+        return
+    }
+    if ($TraceIds.ContainsKey($Request.TraceId)) {
+        throw "duplicate display request trace ID: $($Request.TraceId)"
+    }
+    $BySequence[$Request.Sequence] = $Request
+    $TraceIds[$Request.TraceId] = $true
+}
+
+function Get-PresentMatches([Collections.IEnumerable]$Frames, [uint64]$PresentNanoseconds) {
+    return @($Frames | Where-Object {
+        [Math]::Abs([decimal]$_.PresentNanoseconds - [decimal]$PresentNanoseconds) -le 2000000
+    })
+}
+
+function Assert-PresentMonHeader([string]$Header) {
+    if ($Header -cne $script:presentMonHeader) {
+        throw "PresentMon output does not match the exact 2.5.1 v1 schema"
+    }
+}
+
+function Assert-PresentRow([object]$Row, [uint32]$ExpectedPid, [string]$ExpectedSwapchain) {
+    if ($Row.Application -cne "nvide.exe" -or (Parse-UInt32 $Row.ProcessID "PresentMon PID") -ne $ExpectedPid) {
+        throw "PresentMon row escaped the bound PID"
+    }
+    if ($Row.SwapChainAddress -notmatch '^0x[0-9A-Fa-f]+$') {
+        throw "PresentMon row has an invalid swapchain"
+    }
+    if ($ExpectedSwapchain -and $Row.SwapChainAddress -cne $ExpectedSwapchain) {
+        throw "PresentMon observed multiple swapchains"
+    }
+    if ($Row.Runtime -cne "DXGI" -or $Row.SyncInterval -cne "1" -or $Row.AllowsTearing -cne "0" -or $Row.Dropped -notin @("0", "1")) {
+        throw "PresentMon row violates the DXGI FIFO/no-tearing binding"
+    }
+}
+
+function Convert-PresentFrame([object]$Row, [uint64]$QpcFrequency) {
+    $qpc = Parse-UInt64 $Row.QPCTime "PresentMon QPC time"
+    $presentNanoseconds = [uint64][Math]::Floor([decimal]$qpc * 1000000000 / [decimal]$QpcFrequency)
+    $displayedNanoseconds = $null
+    if ($Row.Dropped -eq "0") {
+        $untilMilliseconds = Parse-InvariantDouble $Row.msUntilDisplayed "PresentMon display offset"
+        if ($untilMilliseconds -lt 0) { throw "negative PresentMon display offset" }
+        $displayedNanoseconds = [uint64][Math]::Floor([decimal]$presentNanoseconds + ([decimal]$untilMilliseconds * 1000000))
+    }
+    return [pscustomobject]@{ PresentNanoseconds = $presentNanoseconds; DisplayedNanoseconds = $displayedNanoseconds }
+}
+
+function Assert-CompleteJoin([hashtable]$Requests, [Collections.IEnumerable]$Frames, [hashtable]$Acknowledged, [int]$ExpectedCount) {
+    if ($Requests.Count -ne $ExpectedCount -or $Acknowledged.Count -ne $ExpectedCount) {
+        throw "expected exactly $ExpectedCount unique requests and acknowledgements"
+    }
+    foreach ($request in $Requests.Values) {
+        $matches = @(Get-PresentMatches $Frames $request.PresentNanoseconds)
+        if ($matches.Count -ne 1 -or $null -eq $matches[0].DisplayedNanoseconds) {
+            throw "display request $($request.Sequence) does not have one unique displayed match"
+        }
+    }
+}
+
+function New-EvidenceDirectory([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        throw "evidence output already exists: $Path"
+    }
+    New-Item -ItemType Directory -Path $Path -ErrorAction Stop | Out-Null
+}
+
+function Stop-ProcessSafely([Diagnostics.Process]$Process) {
+    if ($null -ne $Process -and !$Process.HasExited) {
+        $Process.Kill()
+        if (!$Process.WaitForExit(5000)) {
+            throw "process did not stop after kill"
+        }
+    }
+}
+
+function Stop-PresentationCapture([Diagnostics.Process]$Process, [string]$Executable, [string]$Session) {
+    if ($null -eq $Process -or $Process.HasExited) {
+        return
+    }
+    try {
+        $terminator = Start-Process -FilePath $Executable -ArgumentList @("--session_name", $Session, "--terminate_existing_session") -PassThru -NoNewWindow
+        if (!$terminator.WaitForExit(5000)) {
+            Stop-ProcessSafely $terminator
+        }
+    } catch {
+        # The exact capture process is still terminated below.
+    }
+    if (!$Process.WaitForExit(5000)) {
+        Stop-ProcessSafely $Process
+    }
+}
+
+function Invoke-SelfTest {
+    $root = Join-Path ([IO.Path]::GetTempPath()) ("nvide-phase0-harness-" + [guid]::NewGuid())
+    New-EvidenceDirectory $root
+    try {
+        $valid = Join-Path $root "displayed-request-1.csv"
+        [IO.File]::WriteAllText($valid, "$script:requestHeader`n7,1,1,100`n")
+        $requests = @{}
+        $traces = @{}
+        Register-DisplayRequest (Read-DisplayRequest (Get-Item $valid) 7) $requests $traces
+        if ($requests.Count -ne 1) { throw "valid request fixture failed" }
+
+        [IO.File]::WriteAllText($valid, "bad-header`n7,1,1,100`n")
+        try { Read-DisplayRequest (Get-Item $valid) 7; throw "invalid header fixture passed" } catch { if ($_.Exception.Message -eq "invalid header fixture passed") { throw } }
+        [IO.File]::WriteAllText($valid, "$script:requestHeader`n7,x,1,100`n")
+        try { Read-DisplayRequest (Get-Item $valid) 7; throw "invalid ID fixture passed" } catch { if ($_.Exception.Message -eq "invalid ID fixture passed") { throw } }
+        [IO.File]::WriteAllText($valid, "$script:requestHeader`n7,1,2,100`n")
+        try { Read-DisplayRequest (Get-Item $valid) 7; throw "filename mismatch fixture passed" } catch { if ($_.Exception.Message -eq "filename mismatch fixture passed") { throw } }
+
+        [IO.File]::WriteAllText($valid, "$script:requestHeader`n7,1,1,100`n")
+        $duplicateTrace = Join-Path $root "displayed-request-2.csv"
+        [IO.File]::WriteAllText($duplicateTrace, "$script:requestHeader`n7,1,2,200`n")
+        try { Register-DisplayRequest (Read-DisplayRequest (Get-Item $duplicateTrace) 7) $requests $traces; throw "duplicate trace fixture passed" } catch { if ($_.Exception.Message -eq "duplicate trace fixture passed") { throw } }
+
+        Assert-PresentMonHeader $script:presentMonHeader
+        try { Assert-PresentMonHeader "Application,bad"; throw "PresentMon header fixture passed" } catch { if ($_.Exception.Message -eq "PresentMon header fixture passed") { throw } }
+        $row = "$script:presentMonHeader`nnvide.exe,7,0x1,DXGI,1,0,0,0,0,0,0,Composed: Flip,0,1.0,0,0,0,0,0,10" | ConvertFrom-Csv
+        Assert-PresentRow $row 7 ""
+        if ($null -eq (Convert-PresentFrame $row 10).DisplayedNanoseconds) { throw "displayed fixture failed" }
+        $dropped = "$script:presentMonHeader`nnvide.exe,7,0x1,DXGI,1,0,1,0,0,0,0,Composed: Flip,0,0,0,0,0,0,0,11" | ConvertFrom-Csv
+        Assert-PresentRow $dropped 7 "0x1"
+        if ($null -ne (Convert-PresentFrame $dropped 10).DisplayedNanoseconds) { throw "dropped fixture failed" }
+        try { Assert-PresentRow $row 7 "0x2"; throw "swapchain fixture passed" } catch { if ($_.Exception.Message -eq "swapchain fixture passed") { throw } }
+        $one = @([pscustomobject]@{ PresentNanoseconds = [uint64]100; DisplayedNanoseconds = [uint64]110 })
+        $two = @($one[0], [pscustomobject]@{ PresentNanoseconds = [uint64]101; DisplayedNanoseconds = [uint64]111 })
+        if (@(Get-PresentMatches $one 100).Count -ne 1 -or @(Get-PresentMatches $two 100).Count -ne 2) { throw "join fixture failed" }
+        Assert-CompleteJoin $requests $one @{ 1 = $true } 1
+        try { Assert-CompleteJoin $requests $two @{ 1 = $true } 1; throw "ambiguous join fixture passed" } catch { if ($_.Exception.Message -eq "ambiguous join fixture passed") { throw } }
+        try { Assert-CompleteJoin $requests $one @{} 1; throw "exact count fixture passed" } catch { if ($_.Exception.Message -eq "exact count fixture passed") { throw } }
+
+        $child = Start-Process -FilePath powershell.exe -ArgumentList @("-NoProfile", "-Command", "Start-Sleep -Seconds 30") -PassThru
+        Stop-ProcessSafely $child
+        if (!$child.HasExited) { throw "cleanup fixture failed" }
+        try { New-EvidenceDirectory $root; throw "output reuse fixture passed" } catch { if ($_.Exception.Message -eq "output reuse fixture passed") { throw } }
+        Write-Output "phase0-presentmon self-test passed"
+    } finally {
+        Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if ($SelfTest) {
+    Invoke-SelfTest
+    exit 0
+}
 
 Add-Type -TypeDefinition @"
 using System;
@@ -28,56 +245,27 @@ using System.Text;
 public static class Phase0Native {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct STARTUPINFO {
-        public uint cb;
-        public string lpReserved;
-        public string lpDesktop;
-        public string lpTitle;
-        public uint dwX;
-        public uint dwY;
-        public uint dwXSize;
-        public uint dwYSize;
-        public uint dwXCountChars;
-        public uint dwYCountChars;
-        public uint dwFillAttribute;
-        public uint dwFlags;
-        public ushort wShowWindow;
-        public ushort cbReserved2;
-        public IntPtr lpReserved2;
-        public IntPtr hStdInput;
-        public IntPtr hStdOutput;
-        public IntPtr hStdError;
+        public uint cb; public string lpReserved; public string lpDesktop; public string lpTitle;
+        public uint dwX; public uint dwY; public uint dwXSize; public uint dwYSize;
+        public uint dwXCountChars; public uint dwYCountChars; public uint dwFillAttribute;
+        public uint dwFlags; public ushort wShowWindow; public ushort cbReserved2;
+        public IntPtr lpReserved2; public IntPtr hStdInput; public IntPtr hStdOutput; public IntPtr hStdError;
     }
-
     [StructLayout(LayoutKind.Sequential)]
     public struct PROCESS_INFORMATION {
-        public IntPtr hProcess;
-        public IntPtr hThread;
-        public uint dwProcessId;
-        public uint dwThreadId;
+        public IntPtr hProcess; public IntPtr hThread; public uint dwProcessId; public uint dwThreadId;
     }
-
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern bool CreateProcessW(
-        string applicationName,
-        StringBuilder commandLine,
-        IntPtr processAttributes,
-        IntPtr threadAttributes,
-        bool inheritHandles,
-        uint creationFlags,
-        IntPtr environment,
-        string currentDirectory,
-        ref STARTUPINFO startupInfo,
+    public static extern bool CreateProcessW(string applicationName, StringBuilder commandLine,
+        IntPtr processAttributes, IntPtr threadAttributes, bool inheritHandles, uint creationFlags,
+        IntPtr environment, string currentDirectory, ref STARTUPINFO startupInfo,
         out PROCESS_INFORMATION processInformation);
-
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern uint ResumeThread(IntPtr thread);
-
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool CloseHandle(IntPtr handle);
-
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
-
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool MoveFileExW(string existingName, string newName, uint flags);
 }
@@ -87,283 +275,159 @@ function Quote-Argument([string]$Value) {
     return '"' + $Value.Replace('"', '\"') + '"'
 }
 
-function Parse-InvariantDouble([string]$Value) {
-    return [double]::Parse($Value, [Globalization.CultureInfo]::InvariantCulture)
-}
-
-if (!(Test-Path -LiteralPath $NvideExe -PathType Leaf)) {
-    throw "NVide executable not found: $NvideExe"
-}
-if (!(Test-Path -LiteralPath $PresentMonExe -PathType Leaf)) {
-    throw "PresentMon executable not found: $PresentMonExe"
-}
+$NvideExe = [IO.Path]::GetFullPath($NvideExe)
+$PresentMonExe = [IO.Path]::GetFullPath($PresentMonExe)
+$Output = [IO.Path]::GetFullPath($Output)
+if (!(Test-Path -LiteralPath $NvideExe -PathType Leaf)) { throw "NVide executable not found: $NvideExe" }
+if (!(Test-Path -LiteralPath $PresentMonExe -PathType Leaf)) { throw "PresentMon executable not found: $PresentMonExe" }
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $NvideExe))
 $git = (Get-Command git.exe -ErrorAction Stop).Source
 $gitCommit = (& $git -C $repoRoot rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $gitCommit -notmatch '^[0-9a-f]{40}$') {
-    throw "cannot resolve the benchmark commit"
-}
+if ($LASTEXITCODE -ne 0 -or $gitCommit -notmatch '^[0-9a-f]{40}$') { throw "cannot resolve the benchmark commit" }
 $trackedChanges = & $git -C $repoRoot status --porcelain --untracked-files=no
-if ($LASTEXITCODE -ne 0 -or $trackedChanges) {
-    throw "the benchmark checkout has tracked changes"
-}
+if ($LASTEXITCODE -ne 0 -or $trackedChanges) { throw "the benchmark checkout has tracked changes" }
+$presentMonName = Split-Path -Leaf $PresentMonExe
+if ($presentMonName -notmatch '^PresentMon-([0-9]+(?:\.[0-9]+)+)-x64\.exe$') { throw "PresentMon filename does not carry its version" }
+$presentMonVersion = $Matches[1]
+if ($presentMonVersion -ne "2.5.1") { throw "the approved harness requires PresentMon 2.5.1" }
+New-EvidenceDirectory $Output
 
-New-Item -ItemType Directory -Force -Path $Output | Out-Null
 $rawPath = Join-Path $Output "presentmon.csv"
 $consolePath = Join-Path $Output "presentmon-stderr.txt"
 $captureManifestPath = Join-Path $Output "capture-manifest.txt"
 $ackPath = Join-Path $Output "displayed-ack.csv"
 $session = "nvide-$($RunId -replace '[^A-Za-z0-9]', '-')"
-
 $appArguments = if ($Kind -eq "clear") {
-    @(
-        "--phase0-benchmark", "clear",
-        "--run-id", $RunId,
-        "--output", $Output,
-        "--warmup-seconds", $WarmupSeconds,
-        "--measure-seconds", $MeasureSeconds
-    )
+    @("--phase0-benchmark", "clear", "--run-id", $RunId, "--output", $Output, "--warmup-seconds", $WarmupSeconds, "--measure-seconds", $MeasureSeconds)
 } else {
-    @(
-        "--phase0-benchmark", "edit",
-        "--run-id", $RunId,
-        "--output", $Output,
-        "--warmup-edits", $WarmupEdits,
-        "--measure-edits", $MeasureEdits
-    )
+    @("--phase0-benchmark", "edit", "--run-id", $RunId, "--output", $Output, "--warmup-edits", $WarmupEdits, "--measure-edits", $MeasureEdits)
 }
-if ($UnboundDiagnostic) {
-    $appArguments += "--unbound-diagnostic"
-}
+if ($UnboundDiagnostic) { $appArguments += "--unbound-diagnostic" }
+$captureSeconds = if ($Kind -eq "clear") { $WarmupSeconds + $MeasureSeconds + 10 } else { [Math]::Max(15, ($WarmupEdits + $MeasureEdits) * 2) }
+$presentMonArguments = @("--process_id", "PID", "--output_stdout", "--no_console_stats", "--qpc_time", "--v1_metrics", "--timed", $captureSeconds, "--terminate_after_timed", "--session_name", $session)
 
 $commandLine = New-Object Text.StringBuilder
 [void]$commandLine.Append((Quote-Argument $NvideExe))
-foreach ($argument in $appArguments) {
-    [void]$commandLine.Append(" ")
-    [void]$commandLine.Append((Quote-Argument ([string]$argument)))
-}
+foreach ($argument in $appArguments) { [void]$commandLine.Append(" "); [void]$commandLine.Append((Quote-Argument ([string]$argument))) }
 
 $startup = New-Object Phase0Native+STARTUPINFO
 $startup.cb = [Runtime.InteropServices.Marshal]::SizeOf($startup)
 $processInfo = New-Object Phase0Native+PROCESS_INFORMATION
-$created = [Phase0Native]::CreateProcessW(
-    $NvideExe,
-    $commandLine,
-    [IntPtr]::Zero,
-    [IntPtr]::Zero,
-    $false,
-    0x00000004,
-    [IntPtr]::Zero,
-    (Split-Path -Parent $NvideExe),
-    [ref]$startup,
-    [ref]$processInfo)
-if (!$created) {
-    throw "CreateProcessW failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
-}
-
 $app = $null
 $presentMon = $null
+$stderrTask = $null
 $raw = $null
 $resumed = $false
+$completed = $false
+$failureMessage = "capture did not complete"
 $rows = 0
-$acknowledgements = 0
 $swapchain = $null
-$headers = $null
 $qpcFrequency = [Diagnostics.Stopwatch]::Frequency
 $capturedFrames = New-Object Collections.Generic.List[object]
-$acknowledgedRequests = @{}
-$captureSeconds = if ($Kind -eq "clear") {
-    $WarmupSeconds + $MeasureSeconds + 10
-} else {
-    [Math]::Max(15, ($WarmupEdits + $MeasureEdits) * 2)
-}
+$requests = @{}
+$requestTraceIds = @{}
+$acknowledged = @{}
+$utf8 = New-Object Text.UTF8Encoding($false)
 
 try {
+    $created = [Phase0Native]::CreateProcessW($NvideExe, $commandLine, [IntPtr]::Zero, [IntPtr]::Zero,
+        $false, 0x00000004, [IntPtr]::Zero, (Split-Path -Parent $NvideExe), [ref]$startup, [ref]$processInfo)
+    if (!$created) { throw "CreateProcessW failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
     $app = [Diagnostics.Process]::GetProcessById([int]$processInfo.dwProcessId)
-
+    $presentMonArguments[1] = [string]$processInfo.dwProcessId
     $presentMonStart = New-Object Diagnostics.ProcessStartInfo
     $presentMonStart.FileName = $PresentMonExe
-    $presentMonStart.Arguments = @(
-        "--process_id", $processInfo.dwProcessId,
-        "--output_stdout",
-        "--no_console_stats",
-        "--qpc_time",
-        "--timed", $captureSeconds,
-        "--terminate_after_timed",
-        "--session_name", $session
-    ) -join " "
+    $presentMonStart.Arguments = $presentMonArguments -join " "
     $presentMonStart.UseShellExecute = $false
     $presentMonStart.RedirectStandardOutput = $true
     $presentMonStart.RedirectStandardError = $true
     $presentMon = New-Object Diagnostics.Process
     $presentMon.StartInfo = $presentMonStart
-    if (!$presentMon.Start()) {
-        throw "failed to start PresentMon"
-    }
+    if (!$presentMon.Start()) { throw "failed to start PresentMon" }
+    $stderrTask = $presentMon.StandardError.ReadToEndAsync()
 
     Start-Sleep -Seconds 3
-    if ($presentMon.HasExited) {
-        throw "PresentMon exited before NVide resume: $($presentMon.StandardError.ReadToEnd())"
-    }
-    if ([Phase0Native]::ResumeThread($processInfo.hThread) -eq [uint32]::MaxValue) {
-        throw "ResumeThread failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
-    }
+    if ($presentMon.HasExited) { throw "PresentMon exited before NVide resume" }
+    if ([Phase0Native]::ResumeThread($processInfo.hThread) -eq [uint32]::MaxValue) { throw "ResumeThread failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
     $resumed = $true
     [void][Phase0Native]::CloseHandle($processInfo.hThread)
     $processInfo.hThread = [IntPtr]::Zero
 
-    $utf8 = New-Object Text.UTF8Encoding($false)
     $raw = New-Object IO.StreamWriter($rawPath, $false, $utf8)
-    while (!$presentMon.StandardOutput.EndOfStream) {
-        $line = $presentMon.StandardOutput.ReadLine()
-        if ([string]::IsNullOrWhiteSpace($line)) {
-            continue
+    $headerSeen = $false
+    while ($true) {
+        $lineTask = $presentMon.StandardOutput.ReadLineAsync()
+        while (!$lineTask.Wait(100)) {
+            if ($app.HasExited) { Stop-PresentationCapture $presentMon $PresentMonExe $session }
         }
-        if ($null -eq $headers) {
-            if (!$line.StartsWith("Application,ProcessID,SwapChainAddress,")) {
-                continue
-            }
+        $line = $lineTask.GetAwaiter().GetResult()
+        if ($null -eq $line) { break }
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        if (!$headerSeen) {
+            if (!$line.StartsWith("Application,")) { continue }
+            Assert-PresentMonHeader $line
+            $headerSeen = $true
             $headers = $line.Split(',')
-            foreach ($required in @("Application", "ProcessID", "SwapChainAddress", "PresentRuntime", "SyncInterval", "AllowsTearing", "PresentMode", "TimeInQPC", "MsUntilDisplayed")) {
-                if ($headers -notcontains $required) {
-                    throw "PresentMon output lacks required column: $required"
-                }
-            }
-            $raw.WriteLine($line)
-            $raw.Flush()
+            $raw.WriteLine($line); $raw.Flush()
             continue
         }
-
-        $raw.WriteLine($line)
-        $raw.Flush()
+        $raw.WriteLine($line); $raw.Flush()
         $row = $line | ConvertFrom-Csv -Header $headers
-        if ($row.Application -ne "nvide.exe" -or [uint32]$row.ProcessID -ne $processInfo.dwProcessId) {
-            throw "PresentMon row escaped the bound PID"
-        }
-        if ($null -eq $swapchain) {
-            $swapchain = $row.SwapChainAddress
-        } elseif ($row.SwapChainAddress -ne $swapchain) {
-            throw "PresentMon observed multiple swapchains"
-        }
-        if ($row.PresentRuntime -ne "DXGI" -or $row.SyncInterval -ne "1" -or $row.AllowsTearing -ne "0") {
-            throw "PresentMon row violates the FIFO/no-tearing binding"
-        }
-
+        Assert-PresentRow $row $processInfo.dwProcessId $swapchain
+        if ($null -eq $swapchain) { $swapchain = $row.SwapChainAddress }
+        $capturedFrames.Add((Convert-PresentFrame $row $qpcFrequency))
         $rows++
-        $presentQpc = [decimal]([int64]$row.TimeInQPC)
-        $presentNanoseconds = [uint64][Math]::Floor(
-            $presentQpc * 1000000000 / [decimal]$qpcFrequency)
-        $displayedNanoseconds = $null
-        if ($row.MsUntilDisplayed -ne "NA") {
-            $untilMilliseconds = [decimal](Parse-InvariantDouble $row.MsUntilDisplayed)
-            $displayedNanoseconds = [uint64][Math]::Floor(
-                ($presentQpc * 1000000000 / [decimal]$qpcFrequency) +
-                ($untilMilliseconds * 1000000))
-        }
-        $capturedFrames.Add([pscustomobject]@{
-            PresentNanoseconds = $presentNanoseconds
-            DisplayedNanoseconds = $displayedNanoseconds
-        })
 
         if ($Kind -eq "edit") {
             foreach ($requestFile in Get-ChildItem -LiteralPath $Output -Filter "displayed-request-*.csv") {
-                if ($acknowledgedRequests.ContainsKey($requestFile.FullName)) {
-                    continue
-                }
-                $request = @(Import-Csv -LiteralPath $requestFile.FullName)
-                if ($request.Count -ne 1 -or [uint32]$request[0].pid -ne $processInfo.dwProcessId) {
-                    throw "invalid display request: $($requestFile.Name)"
-                }
-                $requestedPresent = [uint64]$request[0].present_ns
-                $candidates = @($capturedFrames | Where-Object {
-                    [Math]::Abs(
-                        [decimal]$_.PresentNanoseconds - [decimal]$requestedPresent) -le 2000000
-                })
-                if ($candidates.Count -gt 1) {
-                    throw "ambiguous PresentMon match for $($requestFile.Name)"
-                }
-                if ($candidates.Count -eq 0 -or $null -eq $candidates[0].DisplayedNanoseconds) {
-                    continue
-                }
-                $candidate = $candidates[0]
-                $requestedSequence = [uint64]$request[0].frame_sequence
-                $ack = "pid,frame_sequence,displayed_ns`n$($processInfo.dwProcessId),$requestedSequence,$($candidate.DisplayedNanoseconds)`n"
-                $temporaryAck = "$ackPath.tmp-$($processInfo.dwProcessId)-$requestedSequence"
+                $request = Read-DisplayRequest $requestFile $processInfo.dwProcessId
+                Register-DisplayRequest $request $requests $requestTraceIds
+                if ($acknowledged.ContainsKey($request.Sequence)) { continue }
+                $matches = @(Get-PresentMatches $capturedFrames $request.PresentNanoseconds)
+                if ($matches.Count -gt 1) { throw "ambiguous PresentMon match for $($request.Sequence)" }
+                if ($matches.Count -eq 0 -or $null -eq $matches[0].DisplayedNanoseconds) { continue }
+                $ack = "pid,frame_sequence,displayed_ns`n$($processInfo.dwProcessId),$($request.Sequence),$($matches[0].DisplayedNanoseconds)`n"
+                $temporaryAck = "$ackPath.tmp-$($processInfo.dwProcessId)-$($request.Sequence)"
                 [IO.File]::WriteAllText($temporaryAck, $ack, $utf8)
-                if (![Phase0Native]::MoveFileExW($temporaryAck, $ackPath, 0x00000009)) {
-                    throw "atomic acknowledgement replace failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
-                }
-                $acknowledgedRequests[$requestFile.FullName] = $true
-                $acknowledgements++
+                if (![Phase0Native]::MoveFileExW($temporaryAck, $ackPath, 0x00000009)) { throw "atomic acknowledgement replace failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
+                $acknowledged[$request.Sequence] = $true
             }
         }
     }
 
-    $raw.Flush()
-    $presentMon.WaitForExit()
-    [IO.File]::WriteAllText($consolePath, $presentMon.StandardError.ReadToEnd(), $utf8)
-    if ($presentMon.ExitCode -ne 0) {
-        throw "PresentMon failed: $($presentMon.ExitCode)"
-    }
-    if (!$app.WaitForExit(10000)) {
-        $app.Kill()
-        throw "NVide did not exit after the presentation capture"
-    }
-    $appExitCode = 0
-    if (![Phase0Native]::GetExitCodeProcess($processInfo.hProcess, [ref]$appExitCode)) {
-        throw "GetExitCodeProcess failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
-    }
-    if ($appExitCode -ne 0) {
-        throw "NVide failed: $appExitCode"
-    }
-    if ($rows -eq 0 -or [string]::IsNullOrWhiteSpace($swapchain)) {
-        throw "PresentMon captured no bound frames"
-    }
-    if ($Kind -eq "edit" -and $acknowledgements -lt ($WarmupEdits + $MeasureEdits)) {
-        throw "PresentMon produced too few displayed acknowledgements: $acknowledgements"
-    }
-
+    if (!$headerSeen -or $rows -eq 0 -or [string]::IsNullOrWhiteSpace($swapchain)) { throw "PresentMon captured no bound frames with the exact v1 schema" }
+    if (!$app.WaitForExit(10000)) { throw "NVide did not exit after the presentation capture" }
+    $appExitCode = [uint32]0
+    if (![Phase0Native]::GetExitCodeProcess($processInfo.hProcess, [ref]$appExitCode)) { throw "GetExitCodeProcess failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
+    if ($appExitCode -ne 0) { throw "NVide failed: $appExitCode" }
+    if ($presentMon.ExitCode -ne 0) { throw "PresentMon failed: $($presentMon.ExitCode)" }
+    if ($Kind -eq "edit") { Assert-CompleteJoin $requests $capturedFrames $acknowledged ($WarmupEdits + $MeasureEdits) }
+    $completed = $true
+    $failureMessage = ""
+} catch {
+    $failureMessage = $_.Exception.Message.Replace("`r", " ").Replace("`n", " ")
+    throw
+} finally {
+    if (!$resumed -and $processInfo.hThread -ne [IntPtr]::Zero) { [void][Phase0Native]::ResumeThread($processInfo.hThread) }
+    if ($processInfo.hThread -ne [IntPtr]::Zero) { [void][Phase0Native]::CloseHandle($processInfo.hThread) }
+    if ($null -ne $app -and !$app.HasExited) { Stop-ProcessSafely $app }
+    Stop-PresentationCapture $presentMon $PresentMonExe $session
+    if ($null -ne $raw) { $raw.Flush(); $raw.Dispose() }
+    $stderr = if ($null -ne $stderrTask) { $stderrTask.GetAwaiter().GetResult() } else { "" }
+    [IO.File]::WriteAllText($consolePath, $stderr, $utf8)
+    if ($processInfo.hProcess -ne [IntPtr]::Zero) { [void][Phase0Native]::CloseHandle($processInfo.hProcess) }
     $display = Get-CimInstance Win32_VideoController | Select-Object -First 1
-    $presentMonName = Split-Path -Leaf $PresentMonExe
-    if ($presentMonName -notmatch '^PresentMon-([0-9]+(?:\.[0-9]+)+)-x64\.exe$') {
-        throw "PresentMon filename does not carry its version"
-    }
-    $presentMonVersion = $Matches[1]
-    $captureManifest = @(
-        "format=nvide-phase0-capture-v1",
-        "run_id=$RunId",
-        "kind=$Kind",
-        "git_commit=$gitCommit",
-        "pid=$($processInfo.dwProcessId)",
-        "swapchain=$swapchain",
+    $manifest = @(
+        "format=nvide-phase0-capture-v2", "status=$(if ($completed) { 'PASS' } else { 'FAILED' })",
+        "failure=$failureMessage", "run_id=$RunId", "kind=$Kind", "git_commit=$gitCommit",
+        "pid=$($processInfo.dwProcessId)", "swapchain=$swapchain",
         "harness_sha256=$((Get-FileHash -Algorithm SHA256 $PSCommandPath).Hash)",
         "nvide_sha256=$((Get-FileHash -Algorithm SHA256 $NvideExe).Hash)",
-        "presentmon_version=$presentMonVersion",
-        "presentmon_sha256=$((Get-FileHash -Algorithm SHA256 $PresentMonExe).Hash)",
-        "nvide_arguments=$($appArguments -join ' ')",
-        "presentmon_arguments=$($presentMonStart.Arguments)",
-        "qpc_frequency=$qpcFrequency",
-        "presentmon_rows=$rows",
-        "displayed_acknowledgements=$acknowledgements",
+        "presentmon_version=$presentMonVersion", "presentmon_sha256=$((Get-FileHash -Algorithm SHA256 $PresentMonExe).Hash)",
+        "nvide_arguments=$($appArguments -join ' ')", "presentmon_arguments=$($presentMonArguments -join ' ')",
+        "qpc_frequency=$qpcFrequency", "presentmon_rows=$rows", "displayed_acknowledgements=$($acknowledged.Count)",
         "resolution=$($display.CurrentHorizontalResolution)x$($display.CurrentVerticalResolution)",
-        "configured_refresh_hz=$($display.CurrentRefreshRate)",
-        "capture_utc=$([DateTime]::UtcNow.ToString('o'))"
+        "configured_refresh_hz=$($display.CurrentRefreshRate)", "capture_utc=$([DateTime]::UtcNow.ToString('o'))"
     ) -join "`n"
-    [IO.File]::WriteAllText($captureManifestPath, "$captureManifest`n", $utf8)
-} finally {
-    if ($null -ne $raw) {
-        $raw.Dispose()
-    }
-    if (!$resumed -and $processInfo.hThread -ne [IntPtr]::Zero) {
-        [void][Phase0Native]::ResumeThread($processInfo.hThread)
-    }
-    if ($processInfo.hThread -ne [IntPtr]::Zero) {
-        [void][Phase0Native]::CloseHandle($processInfo.hThread)
-    }
-    if ($processInfo.hProcess -ne [IntPtr]::Zero) {
-        [void][Phase0Native]::CloseHandle($processInfo.hProcess)
-    }
-    if ($null -ne $app -and !$app.HasExited) {
-        $app.Kill()
-    }
+    [IO.File]::WriteAllText($captureManifestPath, "$manifest`n", $utf8)
 }

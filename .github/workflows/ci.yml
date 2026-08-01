@@ -25,6 +25,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check Phase 0 presentation harness
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\tools\phase0-presentmon.ps1 -SelfTest
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}

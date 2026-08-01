@@ -566,6 +566,7 @@ struct Trace {
     displayed_ns: Option<u64>,
     sentinel_pixels: bool,
     request_published: bool,
+    finalizer_presented: bool,
     readback: Option<nvide_render::FrameReadback>,
 }
 
@@ -672,10 +673,11 @@ impl Benchmark {
                         BenchmarkAction::Finish
                     };
                 }
-                if pending
-                    .as_ref()
-                    .is_some_and(|trace| trace.frame_sequence.is_some())
+                if let Some(trace) = pending
+                    .as_mut()
+                    .filter(|trace| trace.frame_sequence.is_some())
                 {
+                    trace.finalizer_presented = true;
                     return BenchmarkAction::AwaitDisplay;
                 }
                 if let Some(trace) = pending.as_mut() {
@@ -747,6 +749,7 @@ impl Benchmark {
                 displayed_ns: None,
                 sentinel_pixels: false,
                 request_published: false,
+                finalizer_presented: false,
                 readback: None,
             }));
         }
@@ -826,6 +829,12 @@ impl Benchmark {
         };
         if let Some(trace) = pending.as_mut() {
             publish_display_request(output, trace)?;
+        }
+        if pending
+            .as_ref()
+            .is_some_and(|trace| !trace.finalizer_presented)
+        {
+            return Ok(None);
         }
         let acknowledgements = match fs::read_to_string(output.join("displayed-ack.csv")) {
             Ok(contents) => contents,
@@ -1522,24 +1531,6 @@ mod tests {
             }),
             BenchmarkAction::Continue
         ));
-        assert!(matches!(
-            benchmark.presented(nvide_render::PresentedFrame {
-                sequence: 3,
-                present_ns: 110,
-                readback: None,
-            }),
-            BenchmarkAction::AwaitDisplay
-        ));
-        if let Benchmark::Edit {
-            pending: Some(trace),
-            ..
-        } = &benchmark
-        {
-            assert_eq!(
-                (trace.frame_sequence, trace.present_ns),
-                (Some(2), Some(100))
-            );
-        }
         assert!(benchmark.display_acknowledged()?.is_none());
         assert_eq!(
             fs::read_to_string(output.join("displayed-request-2.csv")).map_err(display_error)?,
@@ -1556,6 +1547,29 @@ mod tests {
             ),
         )
         .map_err(display_error)?;
+        assert!(benchmark.display_acknowledged()?.is_none());
+        assert!(matches!(
+            benchmark.presented(nvide_render::PresentedFrame {
+                sequence: 3,
+                present_ns: 110,
+                readback: None,
+            }),
+            BenchmarkAction::AwaitDisplay
+        ));
+        if let Benchmark::Edit {
+            pending: Some(trace),
+            ..
+        } = &benchmark
+        {
+            assert_eq!(
+                (
+                    trace.frame_sequence,
+                    trace.present_ns,
+                    trace.finalizer_presented
+                ),
+                (Some(2), Some(100), true)
+            );
+        }
         if let Benchmark::Edit {
             pending: Some(trace),
             ..
@@ -1603,6 +1617,40 @@ mod tests {
         );
         fs::remove_dir_all(output).map_err(display_error)?;
         Ok(())
+    }
+
+    #[test]
+    fn edit_benchmark_stabilizes_before_first_dispatch() {
+        let mut benchmark = Benchmark::Edit {
+            run_id: "stabilization-test".to_owned(),
+            output: PathBuf::new(),
+            started: Some(Instant::now()),
+            started_ns: Some(1),
+            warmup_edits: 1,
+            measure_edits: 0,
+            dispatched: 0,
+            pending: None,
+            traces: Vec::new(),
+            failure: None,
+            unbound: false,
+            last_readback: None,
+        };
+        let frame = || nvide_render::PresentedFrame {
+            sequence: 1,
+            present_ns: 1,
+            readback: None,
+        };
+        assert!(matches!(
+            benchmark.presented(frame()),
+            BenchmarkAction::Continue
+        ));
+        if let Benchmark::Edit { started, .. } = &mut benchmark {
+            *started = Some(Instant::now() - EDIT_STABILIZATION);
+        }
+        assert!(matches!(
+            benchmark.presented(frame()),
+            BenchmarkAction::DispatchEdit
+        ));
     }
 
     #[test]
