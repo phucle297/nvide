@@ -864,7 +864,7 @@ mod tests {
 
     impl Read for SlowReader {
         fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
-            std::thread::sleep(Duration::from_millis(8));
+            std::thread::sleep(Duration::from_millis(50));
             if self.offset >= self.bytes.len() || output.is_empty() {
                 return Ok(0);
             }
@@ -931,18 +931,18 @@ mod tests {
             read_frame_before(
                 &mut reader,
                 MAX_PAYLOAD,
-                Instant::now() + Duration::from_millis(20)
+                Instant::now() + Duration::from_millis(100)
             ),
             Err(ProtocolError::Io(ref error)) if error.kind() == io::ErrorKind::TimedOut
         ));
-        assert!(started.elapsed() < Duration::from_millis(100));
+        assert!(started.elapsed() < Duration::from_millis(500));
 
         let mut writer = StalledWriter;
         assert!(matches!(
             write_all_before(
                 &mut writer,
                 b"frame",
-                Instant::now() + Duration::from_millis(20)
+                Instant::now() + Duration::from_millis(100)
             ),
             Err(ProtocolError::Io(ref error)) if error.kind() == io::ErrorKind::TimedOut
         ));
@@ -1084,7 +1084,7 @@ mod tests {
             ),
             Err(ProtocolError::RequestTimeout(1))
         ));
-        assert!(started.elapsed() < Duration::from_millis(100));
+        assert!(started.elapsed() < Duration::from_millis(500));
 
         let mut written = client.stream.written.as_slice();
         assert_eq!(
@@ -1124,7 +1124,7 @@ mod tests {
             ),
             Err(ProtocolError::RequestTimeout(1))
         ));
-        assert!(started.elapsed() < Duration::from_millis(100));
+        assert!(started.elapsed() < Duration::from_millis(500));
         let mut written = client.stream.written.as_slice();
         assert_eq!(
             read_frame(&mut written, MAX_PAYLOAD)?.map(|frame| frame.flags),

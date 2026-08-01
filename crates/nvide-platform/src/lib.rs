@@ -115,7 +115,7 @@ mod local {
     use std::{
         fs::File,
         io::{self, Read, Write},
-        os::windows::io::{FromRawHandle, RawHandle},
+        os::windows::io::{AsRawHandle, FromRawHandle, RawHandle},
         time::{Duration, Instant},
     };
     use windows_sys::Win32::{
@@ -125,7 +125,7 @@ mod local {
             INVALID_HANDLE_VALUE,
         },
         Storage::FileSystem::{
-            CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
+            CreateFileW, ReadFile, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
             OPEN_EXISTING, PIPE_ACCESS_DUPLEX,
         },
         System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency},
@@ -269,14 +269,31 @@ mod local {
 
     impl Read for LocalStream {
         fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-            match self.0.read(bytes) {
-                Ok(read) => Ok(read),
-                Err(error) if error.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) => Ok(0),
-                Err(error) if is_pending(&error) => Err(io::Error::new(
+            if bytes.is_empty() {
+                return Ok(0);
+            }
+            let mut read = 0_u32;
+            // SAFETY: the handle and output buffer are valid for this synchronous call.
+            if unsafe {
+                ReadFile(
+                    self.0.as_raw_handle() as HANDLE,
+                    bytes.as_mut_ptr(),
+                    u32::try_from(bytes.len()).unwrap_or(u32::MAX),
+                    &mut read,
+                    std::ptr::null_mut(),
+                )
+            } != 0
+            {
+                return Ok(read as usize);
+            }
+            // SAFETY: GetLastError reads thread-local state immediately after ReadFile.
+            match unsafe { GetLastError() } {
+                ERROR_NO_DATA => Err(io::Error::new(
                     io::ErrorKind::WouldBlock,
                     "local named-pipe read would block",
                 )),
-                Err(error) => Err(error),
+                ERROR_BROKEN_PIPE => Ok(0),
+                code => Err(io::Error::from_raw_os_error(code as i32)),
             }
         }
     }

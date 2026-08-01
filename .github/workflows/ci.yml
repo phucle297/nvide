@@ -46,7 +46,6 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all --check
       - run: cargo check --workspace --all-targets --all-features --locked
-      - run: cargo metadata --locked --format-version 1 > /dev/null
       - name: Enforce Phase 0 crates and dependency edges
         run: |
           cargo metadata --locked --no-deps --format-version 1 | python3 -c '

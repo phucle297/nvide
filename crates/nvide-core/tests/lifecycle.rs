@@ -1,5 +1,12 @@
 use nvide_ipc::schema;
-use std::{error::Error, io::Write, process::Command};
+use std::{
+    error::Error,
+    io::Write,
+    process::Command,
+    sync::atomic::{AtomicU64, Ordering},
+};
+
+static NEXT_ENDPOINT: AtomicU64 = AtomicU64::new(1);
 
 #[test]
 fn core_failure_restarts_and_rebinds_over_local_transport() -> Result<(), Box<dyn Error>> {
@@ -166,12 +173,13 @@ fn assert_failed(mut child: std::process::Child) -> Result<(), Box<dyn Error>> {
 }
 
 fn test_endpoint(label: &str) -> Result<String, Box<dyn Error>> {
+    let id = NEXT_ENDPOINT.fetch_add(1, Ordering::Relaxed);
     let name = format!("nvide-core-test-{}-{label}", std::process::id());
     if cfg!(windows) {
         Ok(name)
     } else {
         Ok(std::env::temp_dir()
-            .join(format!("{name}.sock"))
+            .join(format!("nvc-{}-{id}.sock", std::process::id()))
             .into_os_string()
             .into_string()
             .map_err(|_| "test IPC path is not UTF-8")?)
