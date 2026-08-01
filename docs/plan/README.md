@@ -1,6 +1,6 @@
 # NVide implementation plan
 
-Status: READY FOR REVIEW
+Status: REVIEWED — two independent approvals
 Last updated: 2026-08-01
 Architecture baseline: `docs/architecture.html` v0.2.1
 Current implementation phase: Phase 0
@@ -19,7 +19,7 @@ Engineering phases and product milestones are different. Phases are execution sl
 - Human and AI agents may fill reviewer roles. Record principals as `human:<handle>` or `agent:<canonical-task-id>`. Every reviewer principal must differ from every author or implementer principal and every other required reviewer principal; for AI, another turn by the same agent is not independent, and one agent cannot fill multiple required reviewer slots.
 - Every phase keeps an evidence ledger at the path named below. Each ledger entry records the stable requirement/acceptance ID, exact artifact path, reproducible verification command, environment/profile, result, date, and reviewer principal. Review records also identify every author or implementer principal and the exact reviewed commit; the inspectable review artifact itself identifies the reviewer principal, verdict, reviewed commit, and review scope. A statement without a runnable command or inspectable artifact is not exit evidence.
 - IDs are immutable after review: prerequisites use `Pn.n`; requirements use `Pn-Rn`; runnable acceptance uses `Pn-An`; exit evidence uses `Pn-En`; release blockers use `Pn-Bn`. Milestones 6A–6D use the milestone prefix. CI must reject duplicate/unknown IDs and any required ID without a ledger reference.
-- This P0.2 amendment changes the reviewed revision, so the plan returns to `READY FOR REVIEW`. `AGREE` may be restored only after two independent reviewers cover both formats, Phase 0–5, and the Phase 6+ umbrella at the amendment commit.
+- The P0.2 amendment is reviewed at commit `60c80a2c778027d504c965ab125de5937a852977`. Two independent reviewers cover both formats, Phase 0–5, and the Phase 6+ umbrella.
 
 ## Overall phase plan
 
@@ -418,14 +418,14 @@ CRDT collaboration, NRPC v2, renderer replacement, and LuaJIT remain research-on
 
 ## Review record
 
-The P0.2 amendment invalidates the prior exact-revision verdicts without invalidating their historical artifacts. This revision is `READY FOR REVIEW`; two eligible reviewers must inspect both formats before any current verdict becomes `AGREE`.
+The P0.2 amendment invalidated the prior exact-revision verdicts without invalidating their historical artifacts. Two eligible reviewers independently inspected both formats at the amendment commit; this revision is `REVIEWED — two independent approvals`.
 
 ### Overall plan gate
 
 | Slot | Reviewer principal | Markdown | HTML | UTC date | Reviewed commit | Artifact | Final verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reviewer 1 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 2 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 1 | `agent:/root/ai_review_parity` | AGREE | AGREE | 2026-08-01 | `60c80a2c778027d504c965ab125de5937a852977` | [`60c80a2-plan-parity.md`](../reviews/60c80a2-plan-parity.md) | AGREE |
+| Reviewer 2 | `agent:/root/plan_amendment_reviewer2` | AGREE | AGREE | 2026-08-01 | `60c80a2c778027d504c965ab125de5937a852977` | [`60c80a2-plan-reviewer2.md`](../reviews/60c80a2-plan-reviewer2.md) | AGREE |
 
 ### Detailed plan gate
 
@@ -433,10 +433,10 @@ The P0.2 amendment invalidates the prior exact-revision verdicts without invalid
 
 | Reviewer / format | Phase 0 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6+ |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reviewer 1 / Markdown | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 1 / HTML | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 2 / Markdown | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Reviewer 2 / HTML | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 1 / Markdown | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
+| Reviewer 1 / HTML | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
+| Reviewer 2 / Markdown | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
+| Reviewer 2 / HTML | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
 
 ## Final verification checklist
 
@@ -447,4 +447,4 @@ The P0.2 amendment invalidates the prior exact-revision verdicts without invalid
 - [x] HTML asset paths resolve; IDs and `<summary>` text are unique; tags are balanced; keyboard/sidebar controls remain accessible.
 - [x] `node --check docs/assets/document.js`, stable-ID checks, whitespace checks, and diff checks pass.
 - [x] No runtime source, dependency, or public API changed; the review-policy amendment is mirrored in Architecture, AGENTS, ADRs, Phase 0 artifacts, and both plan formats.
-- [ ] Two independent reviewers provide inspectable artifacts for the amendment commit, both formats, Phase 0–5, and the Phase 6+ umbrella; both AI reviewers must satisfy the distinct-agent rule.
+- [x] Two independent reviewers provide inspectable artifacts for the amendment commit, both formats, Phase 0–5, and the Phase 6+ umbrella; both AI reviewers satisfy the distinct-agent rule.

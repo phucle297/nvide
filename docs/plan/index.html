@@ -32,7 +32,7 @@
             <h1>NVide Implementation Plan</h1>
             <p class="subtitle">Architecture-bound execution plan from Phase 0 foundations through separately approved post-MVP milestones.</p>
             <dl class="cover-grid">
-              <div><dt>Status</dt><dd>READY FOR REVIEW</dd></div>
+              <div><dt>Status</dt><dd>REVIEWED — two independent approvals</dd></div>
               <div><dt>Last updated</dt><dd>2026-08-01</dd></div>
               <div><dt>Architecture</dt><dd>v0.2.1</dd></div>
               <div><dt>Current phase</dt><dd>Phase 0</dd></div>
@@ -44,7 +44,7 @@
 
           <div class="callout important">
             <div class="callout-title">Canonical plan and review state</div>
-            <p>The Markdown plan is canonical. This HTML may shorten prose but must preserve every normative gate, stable ID, interface, metric, exclusion, and ADR mapping. The P0.2 amendment changes the reviewed revision, so both formats return to ready for review.</p>
+            <p>The Markdown plan is canonical. This HTML may shorten prose but must preserve every normative gate, stable ID, interface, metric, exclusion, and ADR mapping. Two independent reviewers approved both formats at the P0.2 amendment commit.</p>
           </div>
 
           <section>
@@ -57,7 +57,7 @@
               <li>Each phase creates the named evidence ledger during implementation. Every entry records its stable requirement/acceptance ID, artifact path, command, environment/profile, result, date, and reviewer principal. Review records also name every author or implementer principal and exact reviewed commit; the inspectable review artifact itself identifies the reviewer principal, verdict, reviewed commit, and review scope. A claim without a runnable command or inspectable artifact is not exit evidence.</li>
               <li>IDs are immutable after review: prerequisites use <code>Pn.n</code>, requirements <code>Pn-Rn</code>, acceptance <code>Pn-An</code>, evidence <code>Pn-En</code>, and blockers <code>Pn-Bn</code>; 6A–6D use their milestone prefix. CI must reject duplicate/unknown IDs and required IDs without ledger references.</li>
               <li>A phase starts only after dependencies and all prerequisites are approved. Phase 4 may overlap Phase 3 only after Phase 2 exits.</li>
-              <li>Two inspectable, independent review records must cover the amendment commit, both formats, Phase 0–5, and the Phase 6+ umbrella before current verdicts become <code>AGREE</code>.</li>
+              <li>Two inspectable, independent review records cover commit <code>60c80a2c778027d504c965ab125de5937a852977</code>, both formats, Phase 0–5, and the Phase 6+ umbrella.</li>
             </ul>
           </section>
 
@@ -452,22 +452,22 @@
 
           <section>
             <h2 id="reviews">Review record</h2>
-            <p>The P0.2 amendment invalidates the prior exact-revision verdicts without invalidating their historical artifacts. This revision is <code>READY FOR REVIEW</code>; two eligible reviewers must inspect both formats before any current verdict becomes <code>AGREE</code>.</p>
+            <p>The P0.2 amendment invalidated the prior exact-revision verdicts without invalidating their historical artifacts. Two eligible reviewers independently inspected both formats at the amendment commit; this revision is <code>REVIEWED — two independent approvals</code>.</p>
             <article>
               <h3 id="overall-review">Overall plan gate</h3>
               <div class="table-wrap"><table><thead><tr><th>Slot</th><th>Reviewer principal</th><th>Markdown</th><th>HTML</th><th>UTC date</th><th>Reviewed commit</th><th>Artifact</th><th>Final</th></tr></thead><tbody>
-                <tr><td>Reviewer 1</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
-                <tr><td>Reviewer 2</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+                <tr><td>Reviewer 1</td><td><code>agent:/root/ai_review_parity</code></td><td>AGREE</td><td>AGREE</td><td>2026-08-01</td><td><code>60c80a2c778027d504c965ab125de5937a852977</code></td><td><a href="../reviews/60c80a2-plan-parity.md">review artifact</a></td><td>AGREE</td></tr>
+                <tr><td>Reviewer 2</td><td><code>agent:/root/plan_amendment_reviewer2</code></td><td>AGREE</td><td>AGREE</td><td>2026-08-01</td><td><code>60c80a2c778027d504c965ab125de5937a852977</code></td><td><a href="../reviews/60c80a2-plan-reviewer2.md">review artifact</a></td><td>AGREE</td></tr>
               </tbody></table></div>
             </article>
             <article>
               <h3 id="detailed-review">Detailed plan gate</h3>
               <p><code>Reviewer 1</code> and <code>Reviewer 2</code> refer to the principals, reviewed commit, and artifacts in the overall gate. A detailed verdict is invalid when that binding is missing or violates the distinct-agent rule.</p>
               <div class="table-wrap"><table><thead><tr><th>Reviewer / format</th><th>Phase 0</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th><th>Phase 4</th><th>Phase 5</th><th>Phase 6+</th></tr></thead><tbody>
-                <tr><td>Reviewer 1 / Markdown</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
-                <tr><td>Reviewer 1 / HTML</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
-                <tr><td>Reviewer 2 / Markdown</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
-                <tr><td>Reviewer 2 / HTML</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td><td>PENDING</td></tr>
+                <tr><td>Reviewer 1 / Markdown</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td></tr>
+                <tr><td>Reviewer 1 / HTML</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td></tr>
+                <tr><td>Reviewer 2 / Markdown</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td></tr>
+                <tr><td>Reviewer 2 / HTML</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td><td>AGREE</td></tr>
               </tbody></table></div>
             </article>
           </section>
@@ -481,7 +481,7 @@
               <li>☑ Phase 2 preserves “fully navigable” and “crash restore loses no acknowledged edit”.</li>
               <li>☑ Assets resolve; IDs and summaries are unique; tags balance; keyboard/sidebar controls are accessible.</li>
               <li>☑ JavaScript syntax, stable-ID, whitespace, and diff checks pass; no runtime source, dependency, or public API changed, and the policy amendment is mirrored in Architecture, AGENTS, ADRs, Phase 0 artifacts, and both plan formats.</li>
-              <li>☐ Two independent reviewers attach inspectable records for the amendment commit, both formats, Phase 0–5, and the Phase 6+ umbrella; both AI reviewers must satisfy the distinct-agent rule.</li>
+              <li>☑ Two independent reviewers attach inspectable records for the amendment commit, both formats, Phase 0–5, and the Phase 6+ umbrella; both AI reviewers satisfy the distinct-agent rule.</li>
             </ul>
           </section>
 
