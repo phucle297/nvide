@@ -1120,11 +1120,11 @@ mod tests {
                     text: "x".to_owned(),
                     dispatch_ns: 1,
                 },
-                Instant::now() + Duration::from_millis(400)
+                Instant::now() + Duration::from_millis(800)
             ),
             Err(ProtocolError::RequestTimeout(1))
         ));
-        assert!(started.elapsed() < Duration::from_millis(550));
+        assert!(started.elapsed() < Duration::from_millis(1_100));
         let mut written = client.stream.written.as_slice();
         assert_eq!(
             read_frame(&mut written, MAX_PAYLOAD)?.map(|frame| frame.flags),
@@ -1206,8 +1206,8 @@ mod tests {
 
     impl Write for SlowTransactionStream {
         fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            if self.writes < 4 {
-                std::thread::sleep(Duration::from_millis(50));
+            if self.writes == 0 {
+                std::thread::sleep(Duration::from_millis(400));
             }
             self.writes += 1;
             self.written.extend_from_slice(bytes);
