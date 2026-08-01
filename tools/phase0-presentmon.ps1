@@ -156,6 +156,10 @@ function Assert-PresentationExit([int]$ExitCode, [bool]$StoppedAfterApplicationE
     }
 }
 
+function Should-StopAfterApplicationExit([int]$ExitCode, [int64]$ExitObservedMs, [int64]$LastOutputMs, [int64]$NowMs) {
+    return $ExitCode -ne 0 -or $NowMs - $LastOutputMs -ge 1000 -or $NowMs - $ExitObservedMs -ge 5000
+}
+
 function New-EvidenceDirectory([string]$Path) {
     if (Test-Path -LiteralPath $Path) {
         throw "evidence output already exists: $Path"
@@ -230,6 +234,10 @@ function Invoke-SelfTest {
         Assert-PresentationExit -1 $true
         try { Assert-PresentationExit -1 $false; throw "authority exit fixture passed" } catch { if ($_.Exception.Message -eq "authority exit fixture passed") { throw } }
         try { Assert-PresentationExit 5 $true; throw "unexpected authority exit fixture passed" } catch { if ($_.Exception.Message -eq "unexpected authority exit fixture passed") { throw } }
+        if (Should-StopAfterApplicationExit 0 0 500 1499) { throw "quiet-drain fixture stopped early" }
+        if (!(Should-StopAfterApplicationExit 0 0 500 1500)) { throw "quiet-drain fixture did not stop" }
+        if (!(Should-StopAfterApplicationExit 5 0 0 0)) { throw "failed-application fixture did not stop" }
+        if (!(Should-StopAfterApplicationExit 0 0 4999 5000)) { throw "drain-cap fixture did not stop" }
 
         $child = Start-Process -FilePath powershell.exe -ArgumentList @("-NoProfile", "-Command", "Start-Sleep -Seconds 30") -PassThru
         Stop-ProcessSafely $child
@@ -328,6 +336,7 @@ $stderrTask = $null
 $raw = $null
 $resumed = $false
 $stoppedAfterApplicationExit = $false
+$postExitDrainMilliseconds = 0
 $completed = $false
 $failureMessage = "capture did not complete"
 $rows = 0
@@ -365,17 +374,28 @@ try {
 
     $raw = New-Object IO.StreamWriter($rawPath, $false, $utf8)
     $headerSeen = $false
+    $streamClock = [Diagnostics.Stopwatch]::StartNew()
+    $lastOutputMilliseconds = [int64]0
+    $applicationExitObservedMilliseconds = $null
     while ($true) {
         $lineTask = $presentMon.StandardOutput.ReadLineAsync()
         while (!$lineTask.Wait(100)) {
             if ($app.HasExited -and !$presentMon.HasExited) {
-                $stoppedAfterApplicationExit = $true
-                Stop-PresentationCapture $presentMon $PresentMonExe $session
+                $nowMilliseconds = $streamClock.ElapsedMilliseconds
+                if ($null -eq $applicationExitObservedMilliseconds) {
+                    $applicationExitObservedMilliseconds = $nowMilliseconds
+                }
+                if (Should-StopAfterApplicationExit $app.ExitCode $applicationExitObservedMilliseconds $lastOutputMilliseconds $nowMilliseconds) {
+                    $postExitDrainMilliseconds = $nowMilliseconds - $applicationExitObservedMilliseconds
+                    $stoppedAfterApplicationExit = $true
+                    Stop-PresentationCapture $presentMon $PresentMonExe $session
+                }
             }
         }
         $line = $lineTask.GetAwaiter().GetResult()
         if ($null -eq $line) { break }
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $lastOutputMilliseconds = $streamClock.ElapsedMilliseconds
         if (!$headerSeen) {
             if (!$line.StartsWith("Application,")) { continue }
             Assert-PresentMonHeader $line
@@ -441,6 +461,7 @@ try {
         "qpc_frequency=$qpcFrequency", "presentmon_rows=$rows", "displayed_acknowledgements=$($acknowledged.Count)",
         "presentmon_exit_code=$(if ($null -ne $presentMon -and $presentMon.HasExited) { $presentMon.ExitCode } else { '' })",
         "presentmon_stopped_after_application_exit=$stoppedAfterApplicationExit",
+        "presentmon_post_exit_drain_ms=$postExitDrainMilliseconds",
         "resolution=$($display.CurrentHorizontalResolution)x$($display.CurrentVerticalResolution)",
         "configured_refresh_hz=$($display.CurrentRefreshRate)", "capture_utc=$([DateTime]::UtcNow.ToString('o'))"
     ) -join "`n"
