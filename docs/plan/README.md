@@ -1,6 +1,6 @@
 # NVide implementation plan
 
-Status: REVIEWED
+Status: READY FOR REVIEW
 Last updated: 2026-08-01
 Architecture baseline: `docs/architecture.html` v0.2.1
 Current implementation phase: Phase 0
@@ -19,7 +19,7 @@ Engineering phases and product milestones are different. Phases are execution sl
 - Human and AI agents may fill reviewer roles. Record principals as `human:<handle>` or `agent:<canonical-task-id>`. Every reviewer principal must differ from every author or implementer principal and every other required reviewer principal; for AI, another turn by the same agent is not independent, and one agent cannot fill multiple required reviewer slots.
 - Every phase keeps an evidence ledger at the path named below. Each ledger entry records the stable requirement/acceptance ID, exact artifact path, reproducible verification command, environment/profile, result, date, and reviewer principal. Review records also identify every author or implementer principal and the exact reviewed commit; the inspectable review artifact itself identifies the reviewer principal, verdict, reviewed commit, and review scope. A statement without a runnable command or inspectable artifact is not exit evidence.
 - IDs are immutable after review: prerequisites use `Pn.n`; requirements use `Pn-Rn`; runnable acceptance uses `Pn-An`; exit evidence uses `Pn-En`; release blockers use `Pn-Bn`. Milestones 6A–6D use the milestone prefix. CI must reject duplicate/unknown IDs and any required ID without a ledger reference.
-- Two qualifying, independent review artifacts are recorded for commit `710644906cd9589c2e3f2c25a8484088e710feac`; this revision is `REVIEWED`. Both reviewers cover both formats, Phase 0–5, and the Phase 6+ umbrella, and satisfy the distinct-agent rule.
+- This P0.2 amendment changes the reviewed revision, so the plan returns to `READY FOR REVIEW`. `AGREE` may be restored only after two independent reviewers cover both formats, Phase 0–5, and the Phase 6+ umbrella at the amendment commit.
 
 ## Overall phase plan
 
@@ -61,14 +61,14 @@ MVP excludes WASM plugins, full DAP, WSL/Docker/Dev Containers, full Neovim comp
 
 #### Entry gates
 
-The gates are ordered. Workspace implementation is blocked until P0.1 and P0.2 are approved.
+The gates are ordered. Workspace implementation is blocked until P0.1 and the P0.2 protocol are approved. The P0.2 reference-host/tool/calibration binding remains mandatory before P0-E6 and Phase 0 exit.
 
-**Gate status (2026-08-01):** P0.1 `APPROVED`; P0.2 `REVIEW PENDING`; P0.3 `APPROVED`. P0.2 therefore continues to block workspace implementation.
+**Gate status (2026-08-01):** P0.1 `APPROVED`; P0.2 protocol `REVIEW PENDING` and exit binding `PENDING`; P0.3 `APPROVED`. The P0.2 protocol therefore continues to block workspace implementation.
 
 | ID | Required decision or artifact | Owner | Approval | Blocks |
 | --- | --- | --- | --- | --- |
 | P0.1 | Canonical ADR-0002/0003/0005 records plus coding standards and ADR workflow, consistent with Architecture v0.2.1 | Tech lead | ADR acceptance rule; coding standard by tech lead + independent reviewer | All Phase 0 implementation |
-| P0.2 | Benchmark/trace profile naming hardware, OS/toolchain, release build command, warmup, samples, tool, aggregation, and pass rule. “120 FPS clear” means actually presented steady-state frames for an empty window with no workspace/plugins at the fixed resolution/vsync after warmup. The UI↔core fixture uses a unique scripted edit and correlates UI dispatch → core version increment → viewport receipt → first presented glyph; it is a complete-path proof, not an unspecified latency claim. | Performance owner | Phase lead + independent performance reviewer | All Phase 0 workspace implementation |
+| P0.2 | Benchmark/trace protocol defining required hardware/OS/toolchain fields, release build command, warmup, samples, tool semantics, aggregation, and pass rule. “120 FPS clear” means actually presented steady-state frames for an empty window with no workspace/plugins at the fixed resolution/vsync after warmup. The UI↔core fixture uses a unique scripted edit and correlates UI dispatch → core version increment → viewport receipt → first presented glyph. The eligible native host, exact tool command, and calibration may be bound after implementation begins but not after Phase 0 exit. | Performance owner | Protocol: phase lead + independent performance reviewer before workspace; binding: the same roles before P0-E6/exit | Workspace until protocol approval; P0-E6/exit until binding approval |
 | P0.3 | Approved `xtask` command surface and canonical generated-schema ownership/check policy | Build owner | Phase lead + independent reviewer | Schema implementation |
 
 #### Requirement checklist
@@ -83,7 +83,7 @@ The gates are ordered. Workspace implementation is blocked until P0.1 and P0.2 a
 
 #### Ordered work packages and runnable acceptance
 
-1. **P0-A1 — Canonical foundation:** approve P0.1/P0.2, then create only the exact workspace and four-target CI. Acceptance: clean checkout build/test commands and dependency-edge check are recorded and green on all four targets.
+1. **P0-A1 — Canonical foundation:** approve P0.1 and the P0.2 protocol, then create only the exact workspace and four-target CI. Acceptance: clean checkout build/test commands and dependency-edge check are recorded and green on all four targets.
 2. **P0-A2 — Schema pipeline:** approve P0.3, generate NRPC schemas, and make regeneration deterministic. Acceptance: the approved clean-checkout schema command exits zero and `git diff --exit-code` reports no unexplained change.
 3. **P0-A3 — Buffer:** implement rope, line index, conversions, edits, and undo. Acceptance: buffer unit/property tests cover insert/delete/replace, line endings, invalid UTF-8 boundaries, undo/redo branches, and generated edit roundtrips.
 4. **P0-A4 — NRPC and supervisor:** implement local transports, codec/handshake, UI/core child lifecycle, and restart/rebind. Acceptance: subprocess tests cover malformed/oversized/truncated frames, compatible minor versions, incompatible major versions, connect/drop/broken transport, heartbeat loss, restart budget exhaustion, and successful supervised restart.
@@ -98,7 +98,7 @@ The gates are ordered. Workspace implementation is blocked until P0.1 and P0.2 a
 | P0-E3 | Buffer correctness | Ledger maps P0-R4/P0-A3 to unit/property/fuzz artifacts for edits, line index, UTF-8 boundaries, branching undo, and roundtrips |
 | P0-E4 | IPC compatibility/failure | Ledger maps P0-R5/P0-A4 to codec/handshake/framing fuzz for malformed frames, version mismatch, cancellation, transport failure, and real subprocess roundtrip |
 | P0-E5 | Supervisor lifecycle | Ledger maps P0-R6/P0-A4 to forced core failure, restart/rebind, restart-budget exhaustion, and degraded-state evidence under ADR-0017 |
-| P0-E6 | M0.1–M0.3 | Ledger maps P0-R7/P0-A5 to P0.2, exact commands, raw frame samples, shaped-text capture, correlation trace, and first-presented-glyph artifact |
+| P0-E6 | M0.1–M0.3 | Ledger maps P0-R7/P0-A5 to the exit-bound P0.2 native host/tool/calibration, exact commands, raw frame samples, shaped-text capture, correlation trace, and first-presented-glyph artifact |
 
 **Out of scope:** full shell, modal editor, terminal, LSP, Git, plugins, remote, DAP, marketplace, persistent production daemon, and all later-phase crate scaffolding. The render prototype may be replaced once; the buffer API remains stable.
 
@@ -418,14 +418,14 @@ CRDT collaboration, NRPC v2, renderer replacement, and LuaJIT remain research-on
 
 ## Review record
 
-Two qualifying durable review artifacts cover the exact reviewed commit, both formats, every Phase 0–5 plan, and the Phase 6+ umbrella including 6A–6D. Their principals differ from `agent:/root` and from each other, so this revision is `REVIEWED`.
+The P0.2 amendment invalidates the prior exact-revision verdicts without invalidating their historical artifacts. This revision is `READY FOR REVIEW`; two eligible reviewers must inspect both formats before any current verdict becomes `AGREE`.
 
 ### Overall plan gate
 
 | Slot | Reviewer principal | Markdown | HTML | UTC date | Reviewed commit | Artifact | Final verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reviewer 1 | `agent:/root/ai_review_parity` | AGREE | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-plan.md`](../reviews/7106449-plan.md) | AGREE |
-| Reviewer 2 | `agent:/root/ai_review_policy` | AGREE | AGREE | 2026-08-01 | `710644906cd9589c2e3f2c25a8484088e710feac` | [`7106449-p0-plan-policy.md`](../reviews/7106449-p0-plan-policy.md) | AGREE |
+| Reviewer 1 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 2 | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
 
 ### Detailed plan gate
 
@@ -433,10 +433,10 @@ Two qualifying durable review artifacts cover the exact reviewed commit, both fo
 
 | Reviewer / format | Phase 0 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6+ |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reviewer 1 / Markdown | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
-| Reviewer 1 / HTML | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
-| Reviewer 2 / Markdown | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
-| Reviewer 2 / HTML | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE | AGREE |
+| Reviewer 1 / Markdown | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 1 / HTML | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 2 / Markdown | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Reviewer 2 / HTML | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING | PENDING |
 
 ## Final verification checklist
 
@@ -447,4 +447,4 @@ Two qualifying durable review artifacts cover the exact reviewed commit, both fo
 - [x] HTML asset paths resolve; IDs and `<summary>` text are unique; tags are balanced; keyboard/sidebar controls remain accessible.
 - [x] `node --check docs/assets/document.js`, stable-ID checks, whitespace checks, and diff checks pass.
 - [x] No runtime source, dependency, or public API changed; the review-policy amendment is mirrored in Architecture, AGENTS, ADRs, Phase 0 artifacts, and both plan formats.
-- [x] Two independent reviewers provide inspectable artifacts for both formats and Phase 0–5 plus the Phase 6+ umbrella; both AI reviewers satisfy the distinct-agent rule.
+- [ ] Two independent reviewers provide inspectable artifacts for the amendment commit, both formats, Phase 0–5, and the Phase 6+ umbrella; both AI reviewers must satisfy the distinct-agent rule.
