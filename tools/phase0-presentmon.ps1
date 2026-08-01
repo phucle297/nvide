@@ -150,6 +150,12 @@ function Assert-CompleteJoin([hashtable]$Requests, [Collections.IEnumerable]$Fra
     }
 }
 
+function Assert-PresentationExit([int]$ExitCode, [bool]$StoppedAfterApplicationExit) {
+    if ($ExitCode -ne 0 -and !$StoppedAfterApplicationExit) {
+        throw "PresentMon failed: $ExitCode"
+    }
+}
+
 function New-EvidenceDirectory([string]$Path) {
     if (Test-Path -LiteralPath $Path) {
         throw "evidence output already exists: $Path"
@@ -221,6 +227,8 @@ function Invoke-SelfTest {
         Assert-CompleteJoin $requests $one @{ 1 = $true } 1
         try { Assert-CompleteJoin $requests $two @{ 1 = $true } 1; throw "ambiguous join fixture passed" } catch { if ($_.Exception.Message -eq "ambiguous join fixture passed") { throw } }
         try { Assert-CompleteJoin $requests $one @{} 1; throw "exact count fixture passed" } catch { if ($_.Exception.Message -eq "exact count fixture passed") { throw } }
+        Assert-PresentationExit -1 $true
+        try { Assert-PresentationExit -1 $false; throw "authority exit fixture passed" } catch { if ($_.Exception.Message -eq "authority exit fixture passed") { throw } }
 
         $child = Start-Process -FilePath powershell.exe -ArgumentList @("-NoProfile", "-Command", "Start-Sleep -Seconds 30") -PassThru
         Stop-ProcessSafely $child
@@ -318,6 +326,7 @@ $presentMon = $null
 $stderrTask = $null
 $raw = $null
 $resumed = $false
+$stoppedAfterApplicationExit = $false
 $completed = $false
 $failureMessage = "capture did not complete"
 $rows = 0
@@ -358,7 +367,10 @@ try {
     while ($true) {
         $lineTask = $presentMon.StandardOutput.ReadLineAsync()
         while (!$lineTask.Wait(100)) {
-            if ($app.HasExited) { Stop-PresentationCapture $presentMon $PresentMonExe $session }
+            if ($app.HasExited -and !$presentMon.HasExited) {
+                $stoppedAfterApplicationExit = $true
+                Stop-PresentationCapture $presentMon $PresentMonExe $session
+            }
         }
         $line = $lineTask.GetAwaiter().GetResult()
         if ($null -eq $line) { break }
@@ -400,7 +412,7 @@ try {
     $appExitCode = [uint32]0
     if (![Phase0Native]::GetExitCodeProcess($processInfo.hProcess, [ref]$appExitCode)) { throw "GetExitCodeProcess failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
     if ($appExitCode -ne 0) { throw "NVide failed: $appExitCode" }
-    if ($presentMon.ExitCode -ne 0) { throw "PresentMon failed: $($presentMon.ExitCode)" }
+    Assert-PresentationExit $presentMon.ExitCode $stoppedAfterApplicationExit
     if ($Kind -eq "edit") { Assert-CompleteJoin $requests $capturedFrames $acknowledged ($WarmupEdits + $MeasureEdits) }
     $completed = $true
     $failureMessage = ""
@@ -426,6 +438,8 @@ try {
         "presentmon_version=$presentMonVersion", "presentmon_sha256=$((Get-FileHash -Algorithm SHA256 $PresentMonExe).Hash)",
         "nvide_arguments=$($appArguments -join ' ')", "presentmon_arguments=$($presentMonArguments -join ' ')",
         "qpc_frequency=$qpcFrequency", "presentmon_rows=$rows", "displayed_acknowledgements=$($acknowledged.Count)",
+        "presentmon_exit_code=$(if ($null -ne $presentMon -and $presentMon.HasExited) { $presentMon.ExitCode } else { '' })",
+        "presentmon_stopped_after_application_exit=$stoppedAfterApplicationExit",
         "resolution=$($display.CurrentHorizontalResolution)x$($display.CurrentVerticalResolution)",
         "configured_refresh_hz=$($display.CurrentRefreshRate)", "capture_utc=$([DateTime]::UtcNow.ToString('o'))"
     ) -join "`n"
