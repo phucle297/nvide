@@ -280,7 +280,11 @@ impl App {
                     window.request_redraw();
                 }
             }
-            BenchmarkAction::AwaitDisplay => {}
+            BenchmarkAction::AwaitDisplay => {
+                if let Some(window) = self.window.as_ref() {
+                    window.request_redraw();
+                }
+            }
             BenchmarkAction::DispatchEdit => {
                 self.dispatch_benchmark_edit(event_loop);
                 if let Some(window) = self.window.as_ref() {
@@ -663,6 +667,12 @@ impl Benchmark {
                     } else {
                         BenchmarkAction::Finish
                     };
+                }
+                if pending
+                    .as_ref()
+                    .is_some_and(|trace| trace.frame_sequence.is_some())
+                {
+                    return BenchmarkAction::AwaitDisplay;
                 }
                 if let Some(trace) = pending.as_mut() {
                     trace.frame_sequence = Some(frame.sequence);
@@ -1465,13 +1475,36 @@ mod tests {
         };
         benchmark.edit_dispatched(1, 'A', true, 1);
         assert_eq!(benchmark.pending_deadline(), benchmark.readback_deadline());
+        benchmark.shaped(1, 1, "A", 2);
+        assert!(matches!(
+            benchmark.presented(nvide_render::PresentedFrame {
+                sequence: 2,
+                present_ns: 100,
+                readback: Some(nvide_render::FrameReadback {
+                    width: 2,
+                    height: 1,
+                    rgba: vec![1, 2, 3, 4, 9, 8, 7, 6],
+                }),
+            }),
+            BenchmarkAction::AwaitDisplay
+        ));
+        assert!(matches!(
+            benchmark.presented(nvide_render::PresentedFrame {
+                sequence: 3,
+                present_ns: 110,
+                readback: None,
+            }),
+            BenchmarkAction::AwaitDisplay
+        ));
         if let Benchmark::Edit {
             pending: Some(trace),
             ..
-        } = &mut benchmark
+        } = &benchmark
         {
-            trace.frame_sequence = Some(2);
-            trace.present_ns = Some(100);
+            assert_eq!(
+                (trace.frame_sequence, trace.present_ns),
+                (Some(2), Some(100))
+            );
         }
         assert!(benchmark.display_acknowledged()?.is_none());
         fs::write(
