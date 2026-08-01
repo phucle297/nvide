@@ -169,12 +169,12 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                let capture_timeout = self
+                let capture_deadline = self
                     .benchmark
                     .as_ref()
-                    .and_then(Benchmark::readback_timeout);
+                    .and_then(Benchmark::readback_deadline);
                 if let Some(renderer) = self.renderer.as_mut() {
-                    match renderer.render(capture_timeout) {
+                    match renderer.render(capture_deadline) {
                         Ok(frame) => self.after_present(event_loop, frame),
                         Err(error) => self.handle_render_error(event_loop, error),
                     }
@@ -323,7 +323,14 @@ impl App {
             text: character.to_string(),
             dispatch_ns,
         };
-        match core.edit(&request) {
+        let Some(deadline) = self
+            .benchmark
+            .as_ref()
+            .and_then(Benchmark::pending_deadline)
+        else {
+            return self.fail(event_loop, "benchmark edit has no trace deadline");
+        };
+        match core.edit_before(&request, deadline) {
             Ok(viewport)
                 if viewport.trace_id == trace_id && viewport.version == self.version + 1 =>
             {
@@ -342,7 +349,7 @@ impl App {
                             if let Some(benchmark) = self.benchmark.as_mut() {
                                 benchmark.shaped(
                                     trace_id,
-                                    renderer.glyph_count(),
+                                    renderer.first_line_glyph_count(),
                                     &self.text,
                                     expected_frame,
                                 );
@@ -593,14 +600,22 @@ impl Benchmark {
         Ok(())
     }
 
-    fn readback_timeout(&self) -> Option<Duration> {
+    fn pending_deadline(&self) -> Option<Instant> {
         match self {
             Self::Edit {
                 pending: Some(trace),
                 ..
-            } if trace.frame_sequence.is_none() => {
-                Some(Duration::from_secs(5).saturating_sub(trace.started.elapsed()))
-            }
+            } => Some(trace.started + Duration::from_secs(5)),
+            _ => None,
+        }
+    }
+
+    fn readback_deadline(&self) -> Option<Instant> {
+        match self {
+            Self::Edit {
+                pending: Some(trace),
+                ..
+            } if trace.frame_sequence.is_none() => Some(trace.started + Duration::from_secs(5)),
             _ => None,
         }
     }
@@ -757,7 +772,7 @@ impl Benchmark {
             if let Some(trace) = pending.as_mut().filter(|trace| trace.trace_id == trace_id) {
                 trace.shaped_glyphs = Some(glyphs);
                 trace.sentinel_shaped =
-                    glyphs >= text.chars().count() && text.contains(trace.sentinel);
+                    glyphs == text.chars().count() && text.contains(trace.sentinel);
                 trace.expected_frame_sequence = Some(expected_frame_sequence);
             }
         }
@@ -780,6 +795,14 @@ impl Benchmark {
         if *unbound {
             return Ok(None);
         }
+        if pending
+            .as_ref()
+            .is_some_and(|trace| trace.started.elapsed() >= Duration::from_secs(5))
+        {
+            return Err(UiError(
+                "benchmark edit timed out after five seconds".to_owned(),
+            ));
+        }
         let Some((sequence, present_ns)) = pending
             .as_ref()
             .and_then(|trace| trace.frame_sequence.zip(trace.present_ns))
@@ -791,8 +814,22 @@ impl Benchmark {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(display_error(error)),
         };
-        let Some(displayed_ns) =
-            parse_displayed_ack(&acknowledgements, std::process::id(), sequence, present_ns)?
+        if pending
+            .as_ref()
+            .is_some_and(|trace| trace.started.elapsed() >= Duration::from_secs(5))
+        {
+            return Err(UiError(
+                "benchmark edit timed out after five seconds".to_owned(),
+            ));
+        }
+        let received_ns = nvide_platform::monotonic_ns().map_err(display_error)?;
+        let Some(displayed_ns) = parse_displayed_ack(
+            &acknowledgements,
+            std::process::id(),
+            sequence,
+            present_ns,
+            received_ns,
+        )?
         else {
             return Ok(None);
         };
@@ -973,6 +1010,7 @@ fn parse_displayed_ack(
     pid: u32,
     sequence: u64,
     present_ns: u64,
+    received_ns: u64,
 ) -> Result<Option<u64>, UiError> {
     let mut lines = contents.lines();
     if lines.next() != Some("pid,frame_sequence,displayed_ns") {
@@ -1004,6 +1042,11 @@ fn parse_displayed_ack(
     if acknowledged_pid != pid {
         return Err(UiError(
             "acknowledgement PID does not match NVide".to_owned(),
+        ));
+    }
+    if displayed_ns > received_ns {
+        return Err(UiError(
+            "displayed timestamp is later than acknowledgement receipt".to_owned(),
         ));
     }
     if acknowledged_sequence < sequence {
@@ -1077,6 +1120,14 @@ impl CoreSupervisor {
         request: &schema::EditRequest,
     ) -> Result<schema::ViewportSnapshot, nvide_ipc::ProtocolError> {
         self.client.edit(request)
+    }
+
+    fn edit_before(
+        &mut self,
+        request: &schema::EditRequest,
+        deadline: Instant,
+    ) -> Result<schema::ViewportSnapshot, nvide_ipc::ProtocolError> {
+        self.client.edit_before(request, deadline)
     }
 
     fn heartbeat(&mut self, sequence: u64) -> CoreHealth {
@@ -1390,6 +1441,7 @@ mod tests {
             last_readback: None,
         };
         benchmark.edit_dispatched(1, 'A', true, 1);
+        assert_eq!(benchmark.pending_deadline(), benchmark.readback_deadline());
         if let Benchmark::Edit {
             pending: Some(trace),
             ..
@@ -1407,6 +1459,21 @@ mod tests {
             ),
         )
         .map_err(display_error)?;
+        if let Benchmark::Edit {
+            pending: Some(trace),
+            ..
+        } = &mut benchmark
+        {
+            trace.started = Instant::now() - Duration::from_secs(5);
+        }
+        assert!(benchmark.display_acknowledged().is_err());
+        if let Benchmark::Edit {
+            pending: Some(trace),
+            ..
+        } = &mut benchmark
+        {
+            trace.started = Instant::now();
+        }
         assert!(matches!(
             benchmark.display_acknowledged()?,
             Some(BenchmarkAction::Finish)
@@ -1426,10 +1493,15 @@ mod tests {
         assert!(readback_changed(&changed, None));
         assert!(!readback_changed(&changed, Some(&changed.rgba)));
         assert!(
-            parse_displayed_ack("pid,frame_sequence,displayed_ns\n1,3,101\n", 1, 2, 100).is_err()
+            parse_displayed_ack("pid,frame_sequence,displayed_ns\n1,3,101\n", 1, 2, 100, 101)
+                .is_err()
+        );
+        assert!(
+            parse_displayed_ack("pid,frame_sequence,displayed_ns\n1,2,102\n", 1, 2, 100, 101)
+                .is_err()
         );
         assert_eq!(
-            parse_displayed_ack("pid,frame_sequence,displayed_ns\n1,1,101\n", 1, 2, 100)?,
+            parse_displayed_ack("pid,frame_sequence,displayed_ns\n1,1,101\n", 1, 2, 100, 101)?,
             None
         );
         fs::remove_dir_all(output).map_err(display_error)?;

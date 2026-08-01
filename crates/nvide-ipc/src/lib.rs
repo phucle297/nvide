@@ -59,6 +59,14 @@ impl Frame {
     }
 
     pub fn write_to(&self, mut writer: impl Write) -> Result<(), ProtocolError> {
+        self.write_to_before(&mut writer, Instant::now() + QUEUE_WAIT)
+    }
+
+    fn write_to_before(
+        &self,
+        writer: &mut impl Write,
+        deadline: Instant,
+    ) -> Result<(), ProtocolError> {
         validate_flags(self.flags, &self.payload)?;
         let length = u32::try_from(self.payload.len()).map_err(|_| ProtocolError::Oversized {
             length: self.payload.len(),
@@ -70,12 +78,24 @@ impl Frame {
                 maximum: MAX_PAYLOAD,
             });
         }
-        let deadline = Instant::now() + QUEUE_WAIT;
-        write_all_before(&mut writer, &length.to_le_bytes(), deadline)?;
-        write_all_before(&mut writer, &self.stream_id.to_le_bytes(), deadline)?;
-        write_all_before(&mut writer, &self.flags.to_le_bytes(), deadline)?;
-        write_all_before(&mut writer, &self.payload, deadline)?;
+        write_all_before(writer, &length.to_le_bytes(), deadline)?;
+        write_all_before(writer, &self.stream_id.to_le_bytes(), deadline)?;
+        write_all_before(writer, &self.flags.to_le_bytes(), deadline)?;
+        write_all_before(writer, &self.payload, deadline)?;
         Ok(())
+    }
+
+    fn write_once(&self, writer: &mut impl Write) -> Result<(), ProtocolError> {
+        let bytes = self.encoded()?;
+        match writer.write(&bytes) {
+            Ok(written) if written == bytes.len() => Ok(()),
+            Ok(_) => Err(io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "NRPC cancellation write was partial",
+            )
+            .into()),
+            Err(error) => Err(error.into()),
+        }
     }
 
     pub fn encoded(&self) -> Result<Vec<u8>, ProtocolError> {
@@ -260,6 +280,14 @@ fn write_all_before(
             }
             Err(error) => return Err(error.into()),
         }
+    }
+    Ok(())
+}
+
+fn flush_before(writer: &mut impl Write, deadline: Instant) -> Result<(), ProtocolError> {
+    writer.flush()?;
+    if Instant::now() >= deadline {
+        return Err(io::Error::new(io::ErrorKind::TimedOut, "NRPC flush timed out").into());
     }
     Ok(())
 }
@@ -679,10 +707,14 @@ pub struct Client<S> {
 
 impl<S: Read + Write> Client<S> {
     pub fn connect(mut stream: S, role: schema::Role) -> Result<Self, ProtocolError> {
+        let deadline = Instant::now() + QUEUE_WAIT;
         let mut session = Session::new(Side::Connector, role, MAX_PAYLOAD);
-        session.start_handshake()?.write_to(&mut stream)?;
-        stream.flush()?;
-        let reply = read_frame(&mut stream, MAX_PAYLOAD)?.ok_or(ProtocolError::TruncatedFrame)?;
+        session
+            .start_handshake()?
+            .write_to_before(&mut stream, deadline)?;
+        flush_before(&mut stream, deadline)?;
+        let reply = read_frame_before(&mut stream, MAX_PAYLOAD, deadline)?
+            .ok_or(ProtocolError::TruncatedFrame)?;
         session.accept_hello_ack(reply)?;
         Ok(Self { stream, session })
     }
@@ -691,32 +723,41 @@ impl<S: Read + Write> Client<S> {
         &mut self,
         request: &schema::EditRequest,
     ) -> Result<schema::ViewportSnapshot, ProtocolError> {
+        self.edit_before(request, Instant::now() + QUEUE_WAIT)
+    }
+
+    pub fn edit_before(
+        &mut self,
+        request: &schema::EditRequest,
+        deadline: Instant,
+    ) -> Result<schema::ViewportSnapshot, ProtocolError> {
         let frame = self.session.open_request(application_message(
             MESSAGE_EDIT,
             schema::encode_edit(request),
         ))?;
         let stream_id = frame.stream_id;
-        frame.write_to(&mut self.stream)?;
-        self.stream.flush()?;
-        let reply = match read_frame(&mut self.stream, self.session.maximum_payload()) {
-            Err(ProtocolError::Io(error))
-                if matches!(
-                    error.kind(),
-                    io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
-                ) =>
-            {
-                self.session.cancel(stream_id)?.write_to(&mut self.stream)?;
-                self.stream.flush()?;
-                return Err(ProtocolError::RequestTimeout(stream_id));
+        frame.write_to_before(&mut self.stream, deadline)?;
+        flush_before(&mut self.stream, deadline)?;
+        let reply =
+            match read_frame_before(&mut self.stream, self.session.maximum_payload(), deadline) {
+                Err(ProtocolError::Io(error))
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+                    ) =>
+                {
+                    let cancellation = self.session.cancel(stream_id)?;
+                    let _ = cancellation.write_once(&mut self.stream);
+                    return Err(ProtocolError::RequestTimeout(stream_id));
+                }
+                result => result?,
             }
-            result => result?,
-        }
-        .ok_or(ProtocolError::TruncatedFrame)?;
+            .ok_or(ProtocolError::TruncatedFrame)?;
         let accepted = self
             .session
             .accept_frame(reply)?
             .ok_or(ProtocolError::Lifecycle("terminal response was ignored"))?;
-        match accepted {
+        let result = match accepted {
             AcceptedFrame::Response(frame) if frame.flags & ERR == 0 => Ok(
                 schema::decode_viewport(application_body(&frame.payload, MESSAGE_VIEWPORT)?)?,
             ),
@@ -731,13 +772,18 @@ impl<S: Read + Write> Client<S> {
                 }))
             }
             _ => Err(ProtocolError::Lifecycle("expected edit response")),
+        };
+        if Instant::now() >= deadline {
+            return Err(ProtocolError::RequestTimeout(stream_id));
         }
+        result
     }
 
     pub fn heartbeat(&mut self, sequence: u64) -> Result<(), ProtocolError> {
-        Session::heartbeat(sequence)?.write_to(&mut self.stream)?;
-        self.stream.flush()?;
-        let reply = read_frame(&mut self.stream, self.session.maximum_payload())?
+        let deadline = Instant::now() + QUEUE_WAIT;
+        Session::heartbeat(sequence)?.write_to_before(&mut self.stream, deadline)?;
+        flush_before(&mut self.stream, deadline)?;
+        let reply = read_frame_before(&mut self.stream, self.session.maximum_payload(), deadline)?
             .ok_or(ProtocolError::TruncatedFrame)?;
         match self.session.accept_frame(reply)? {
             Some(AcceptedFrame::Heartbeat(received)) if received == sequence => Ok(()),
@@ -751,11 +797,13 @@ where
     S: Read + Write,
     F: FnMut(schema::EditRequest) -> Result<schema::ViewportSnapshot, schema::RpcError>,
 {
+    let handshake_deadline = Instant::now() + QUEUE_WAIT;
     let mut session = Session::new(Side::Listener, schema::Role::Core, MAX_PAYLOAD);
-    let hello = read_frame(&mut stream, MAX_PAYLOAD)?.ok_or(ProtocolError::TruncatedFrame)?;
+    let hello = read_frame_before(&mut stream, MAX_PAYLOAD, handshake_deadline)?
+        .ok_or(ProtocolError::TruncatedFrame)?;
     let reply = session.accept_hello(hello)?;
-    reply.write_to(&mut stream)?;
-    stream.flush()?;
+    reply.write_to_before(&mut stream, handshake_deadline)?;
+    flush_before(&mut stream, handshake_deadline)?;
     if !session.is_established() {
         return Err(ProtocolError::IncompatibleMajor);
     }
@@ -1015,22 +1063,62 @@ mod tests {
         )?
         .encoded()?;
         let mut client = Client::connect(TimeoutStream::new(reply), schema::Role::Ui)?;
+        let started = Instant::now();
         assert!(matches!(
-            client.edit(&schema::EditRequest {
-                trace_id: 1,
-                expected_version: 0,
-                char_offset: 0,
-                text: "x".to_owned(),
-                dispatch_ns: 1,
-            }),
+            client.edit_before(
+                &schema::EditRequest {
+                    trace_id: 1,
+                    expected_version: 0,
+                    char_offset: 0,
+                    text: "x".to_owned(),
+                    dispatch_ns: 1,
+                },
+                Instant::now() + Duration::from_millis(20)
+            ),
             Err(ProtocolError::RequestTimeout(1))
         ));
+        assert!(started.elapsed() < Duration::from_millis(100));
 
         let mut written = client.stream.written.as_slice();
         assert_eq!(
             read_frame(&mut written, MAX_PAYLOAD)?.map(|frame| frame.stream_id),
             Some(0)
         );
+        assert_eq!(
+            read_frame(&mut written, MAX_PAYLOAD)?.map(|frame| frame.flags),
+            Some(REQ)
+        );
+        assert_eq!(
+            read_frame(&mut written, MAX_PAYLOAD)?.map(|frame| frame.flags),
+            Some(CANCEL)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn edit_deadline_is_shared_across_write_and_read() -> Result<(), ProtocolError> {
+        let (session, _) = connected_sessions()?;
+        let stream = SlowTransactionStream {
+            written: Vec::new(),
+            writes: 0,
+        };
+        let mut client = Client { stream, session };
+        let started = Instant::now();
+        assert!(matches!(
+            client.edit_before(
+                &schema::EditRequest {
+                    trace_id: 1,
+                    expected_version: 0,
+                    char_offset: 0,
+                    text: "x".to_owned(),
+                    dispatch_ns: 1,
+                },
+                Instant::now() + Duration::from_millis(30)
+            ),
+            Err(ProtocolError::RequestTimeout(1))
+        ));
+        assert!(started.elapsed() < Duration::from_millis(100));
+        let mut written = client.stream.written.as_slice();
         assert_eq!(
             read_frame(&mut written, MAX_PAYLOAD)?.map(|frame| frame.flags),
             Some(REQ)
@@ -1093,6 +1181,35 @@ mod tests {
     struct TimeoutStream {
         reply: std::io::Cursor<Vec<u8>>,
         written: Vec<u8>,
+    }
+
+    struct SlowTransactionStream {
+        written: Vec<u8>,
+        writes: usize,
+    }
+
+    impl Read for SlowTransactionStream {
+        fn read(&mut self, _bytes: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "stalled response",
+            ))
+        }
+    }
+
+    impl Write for SlowTransactionStream {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.writes < 4 {
+                std::thread::sleep(Duration::from_millis(4));
+            }
+            self.writes += 1;
+            self.written.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
     }
 
     impl TimeoutStream {

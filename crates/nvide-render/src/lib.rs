@@ -397,12 +397,19 @@ impl Renderer {
         self.glyph_count
     }
 
+    pub fn first_line_glyph_count(&self) -> usize {
+        self.shaping
+            .layout_runs()
+            .next()
+            .map_or(0, |run| run.glyphs.len())
+    }
+
     pub fn render(
         &mut self,
-        capture_timeout: Option<Duration>,
+        capture_deadline: Option<Instant>,
     ) -> Result<PresentedFrame, RenderError> {
         self.check_device()?;
-        if capture_timeout.is_some() && !self.readback_supported {
+        if capture_deadline.is_some() && !self.readback_supported {
             return Err(RenderError::ReadbackUnsupported);
         }
         let frame = match self.surface.get_current_texture() {
@@ -449,15 +456,15 @@ impl Renderer {
                 pass.draw_indexed(0..self.index_count, 0, 0..1);
             }
         }
-        let readback = capture_timeout
-            .map(|timeout| (self.encode_readback(&mut encoder, &frame.texture), timeout));
+        let readback = capture_deadline
+            .map(|deadline| (self.encode_readback(&mut encoder, &frame.texture), deadline));
         self.queue.submit([encoder.finish()]);
         frame.present();
         let present_ns = nvide_platform::monotonic_ns()
             .map_err(|error| RenderError::Timestamp(error.to_string()))?;
         self.frame_sequence = self.frame_sequence.saturating_add(1);
         let readback = readback
-            .map(|(pending, timeout)| self.finish_readback(pending, timeout))
+            .map(|(pending, deadline)| self.finish_readback(pending, deadline))
             .transpose()?;
         self.check_device()?;
         Ok(PresentedFrame {
@@ -527,26 +534,24 @@ impl Renderer {
     fn finish_readback(
         &self,
         pending: PendingReadback,
-        timeout: Duration,
+        deadline: Instant,
     ) -> Result<FrameReadback, RenderError> {
         let slice = pending.buffer.slice(..);
         let (sender, receiver) = mpsc::channel();
         slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = sender.send(result);
         });
-        let deadline = Instant::now() + timeout;
         let mapped = loop {
             self.device.poll(wgpu::Maintain::Poll);
+            if Instant::now() >= deadline {
+                return Err(readback_deadline_error());
+            }
             match receiver.try_recv() {
                 Ok(result) => break result,
                 Err(mpsc::TryRecvError::Empty) if Instant::now() < deadline => {
                     thread::sleep(Duration::from_millis(1));
                 }
-                Err(mpsc::TryRecvError::Empty) => {
-                    return Err(RenderError::Readback(
-                        "mapping exceeded the trace deadline".to_owned(),
-                    ))
-                }
+                Err(mpsc::TryRecvError::Empty) => return Err(readback_deadline_error()),
                 Err(mpsc::TryRecvError::Disconnected) => {
                     return Err(RenderError::Readback(
                         "mapping callback disconnected".to_owned(),
@@ -555,6 +560,9 @@ impl Renderer {
             }
         };
         mapped.map_err(|error| RenderError::Readback(error.to_string()))?;
+        if Instant::now() >= deadline {
+            return Err(readback_deadline_error());
+        }
         let mapped = slice.get_mapped_range();
         let mut rgba = Vec::with_capacity((pending.row_bytes * pending.height) as usize);
         for row in mapped.chunks_exact(pending.padded_row_bytes as usize) {
@@ -562,12 +570,19 @@ impl Renderer {
         }
         drop(mapped);
         pending.buffer.unmap();
+        if Instant::now() >= deadline {
+            return Err(readback_deadline_error());
+        }
         Ok(FrameReadback {
             width: pending.width,
             height: pending.height,
             rgba,
         })
     }
+}
+
+fn readback_deadline_error() -> RenderError {
+    RenderError::Readback("mapping exceeded the trace deadline".to_owned())
 }
 
 struct PendingReadback {
