@@ -1,6 +1,6 @@
 # P0.2 native presentation binding revalidation candidate
 
-- Status: EXIT BINDING REVALIDATION REVIEW PENDING; NOT P0-E6 EVIDENCE
+- Status: EXIT BINDING REVALIDATION APPROVED; NOT P0-E6 EVIDENCE
 - Candidate implementation commit: `2d9ed1412657dca23f061017fc0ed0f9508b5278`
 - Owner: Performance owner
 - Prepared by: `agent:/root`
@@ -94,5 +94,5 @@ The atomic-ACK amendment changes the approved harness hash, so these verdicts no
 
 | Role | Reviewer principal | Verdict | UTC date | Reviewed commit | Artifact |
 | --- | --- | --- | --- | --- | --- |
-| Phase lead | PENDING | PENDING | PENDING | PENDING | PENDING |
-| Performance reviewer | PENDING | PENDING | PENDING | PENDING | PENDING |
+| Phase lead | `agent:/root/p02_exit_binding_lead` | AGREE | 2026-08-01 | `2fcd9a4ead318990288b2dcc1c198c691849441c` | [`2fcd9a4-p02-final-rebinding-phase-lead.md`](../reviews/2fcd9a4-p02-final-rebinding-phase-lead.md) |
+| Performance reviewer | `agent:/root/p02_exit_binding_performance` | AGREE | 2026-08-01 | `2fcd9a4ead318990288b2dcc1c198c691849441c` | [`2fcd9a4-p02-final-rebinding-performance.md`](../reviews/2fcd9a4-p02-final-rebinding-performance.md) |
