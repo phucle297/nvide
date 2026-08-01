@@ -1,0 +1,30 @@
+[package]
+name = "nvide-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+nvide-buffer = { path = "../crates/nvide-buffer" }
+nvide-ipc = { path = "../crates/nvide-ipc" }
+
+[[bin]]
+name = "buffer"
+path = "fuzz_targets/buffer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nrpc"
+path = "fuzz_targets/nrpc.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

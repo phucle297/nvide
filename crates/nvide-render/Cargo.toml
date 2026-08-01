@@ -1,0 +1,13 @@
+[package]
+name = "nvide-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cosmic-text.workspace = true
+wgpu.workspace = true
+
+[lints]
+workspace = true

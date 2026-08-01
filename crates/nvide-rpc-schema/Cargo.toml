@@ -1,0 +1,17 @@
+[package]
+name = "nvide-rpc-schema"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+xtask = ["dep:capnpc"]
+
+[dependencies]
+capnp.workspace = true
+capnpc = { workspace = true, optional = true }
+
+[lints]
+workspace = true

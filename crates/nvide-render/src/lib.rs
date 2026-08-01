@@ -1,0 +1,544 @@
+//! One-atlas shaped-text renderer for the Phase 0 viewport.
+
+use cosmic_text::{
+    Attrs, Buffer as ShapingBuffer, Family, FontSystem, Metrics, Shaping, SwashCache, SwashContent,
+};
+use std::{
+    error::Error,
+    fmt,
+    future::Future,
+    sync::Arc,
+    task::{Context, Poll, Wake, Waker},
+    thread,
+};
+use wgpu::util::DeviceExt;
+
+const ATLAS_SIZE: u32 = 1_024;
+const SHADER: &str = r#"
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+@group(0) @binding(0) var atlas: texture_2d<f32>;
+@group(0) @binding(1) var atlas_sampler: sampler;
+
+@vertex
+fn vs_main(@location(0) input: vec4<f32>) -> VertexOutput {
+    var output: VertexOutput;
+    output.position = vec4<f32>(input.xy, 0.0, 1.0);
+    output.uv = input.zw;
+    return output;
+}
+
+@fragment
+fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(atlas, atlas_sampler, input.uv);
+}
+"#;
+
+#[derive(Debug)]
+pub enum RenderError {
+    Initialization(String),
+    AtlasFull,
+    SurfaceLost,
+    Timeout,
+    OutOfMemory,
+    DeviceLost(String),
+}
+
+impl fmt::Display for RenderError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Initialization(message) => {
+                write!(formatter, "renderer initialization failed: {message}")
+            }
+            Self::AtlasFull => formatter.write_str("the Phase 0 glyph atlas is full"),
+            Self::SurfaceLost => {
+                formatter.write_str("render surface remained unavailable after reconfigure")
+            }
+            Self::Timeout => formatter.write_str("render surface timed out"),
+            Self::OutOfMemory => formatter.write_str("GPU is out of memory"),
+            Self::DeviceLost(message) => write!(formatter, "GPU device was lost: {message}"),
+        }
+    }
+}
+
+impl Error for RenderError {}
+
+pub struct Renderer {
+    surface: wgpu::Surface<'static>,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    pipeline: wgpu::RenderPipeline,
+    atlas: wgpu::Texture,
+    bind_group: wgpu::BindGroup,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    index_count: u32,
+    font_system: FontSystem,
+    shaping: ShapingBuffer,
+    swash_cache: SwashCache,
+    text: String,
+}
+
+impl Renderer {
+    pub fn new<W>(window: Arc<W>, width: u32, height: u32) -> Result<Self, RenderError>
+    where
+        W: wgpu::rwh::HasDisplayHandle + wgpu::rwh::HasWindowHandle + Send + Sync + 'static,
+    {
+        block_on(Self::new_async(window, width, height))
+    }
+
+    async fn new_async<W>(window: Arc<W>, width: u32, height: u32) -> Result<Self, RenderError>
+    where
+        W: wgpu::rwh::HasDisplayHandle + wgpu::rwh::HasWindowHandle + Send + Sync + 'static,
+    {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
+        let surface = instance
+            .create_surface(window)
+            .map_err(|error| RenderError::Initialization(error.to_string()))?;
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .ok_or_else(|| RenderError::Initialization("no compatible GPU adapter".to_owned()))?;
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("nvide-device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: wgpu::MemoryHints::MemoryUsage,
+                },
+                None,
+            )
+            .await
+            .map_err(|error| RenderError::Initialization(error.to_string()))?;
+        let capabilities = surface.get_capabilities(&adapter);
+        let format = capabilities
+            .formats
+            .iter()
+            .copied()
+            .find(wgpu::TextureFormat::is_srgb)
+            .or_else(|| capabilities.formats.first().copied())
+            .ok_or_else(|| RenderError::Initialization("surface exposes no format".to_owned()))?;
+        let alpha_mode = capabilities.alpha_modes.first().copied().ok_or_else(|| {
+            RenderError::Initialization("surface exposes no alpha mode".to_owned())
+        })?;
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format,
+            width: width.max(1),
+            height: height.max(1),
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode,
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+        surface.configure(&device, &config);
+
+        let atlas = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("nvide-glyph-atlas"),
+            size: wgpu::Extent3d {
+                width: ATLAS_SIZE,
+                height: ATLAS_SIZE,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let view = atlas.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("nvide-atlas-sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("nvide-atlas-layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("nvide-atlas-bind-group"),
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("nvide-text-shader"),
+            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("nvide-text-pipeline-layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("nvide-text-pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: 16,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 0,
+                    }],
+                }],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+        let vertex_buffer =
+            empty_buffer(&device, "nvide-empty-vertices", wgpu::BufferUsages::VERTEX);
+        let index_buffer = empty_buffer(&device, "nvide-empty-indices", wgpu::BufferUsages::INDEX);
+        let mut font_system = FontSystem::new();
+        let shaping = ShapingBuffer::new(&mut font_system, Metrics::new(24.0, 32.0));
+        Ok(Self {
+            surface,
+            device,
+            queue,
+            config,
+            pipeline,
+            atlas,
+            bind_group,
+            vertex_buffer,
+            index_buffer,
+            index_count: 0,
+            font_system,
+            shaping,
+            swash_cache: SwashCache::new(),
+            text: String::new(),
+        })
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<(), RenderError> {
+        self.config.width = width.max(1);
+        self.config.height = height.max(1);
+        self.surface.configure(&self.device, &self.config);
+        let text = self.text.clone();
+        self.set_text(&text)
+    }
+
+    pub fn set_text(&mut self, text: &str) -> Result<(), RenderError> {
+        self.text.clear();
+        self.text.push_str(text);
+        self.shaping.set_size(
+            &mut self.font_system,
+            Some(self.config.width as f32),
+            Some(self.config.height as f32),
+        );
+        self.shaping.set_text(
+            &mut self.font_system,
+            text,
+            &Attrs::new().family(Family::Monospace),
+            Shaping::Advanced,
+        );
+        let (atlas_bytes, vertices, indices) = build_atlas(
+            &self.shaping,
+            &mut self.font_system,
+            &mut self.swash_cache,
+            self.config.width,
+            self.config.height,
+        )?;
+        self.queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &self.atlas,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &atlas_bytes,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(ATLAS_SIZE * 4),
+                rows_per_image: Some(ATLAS_SIZE),
+            },
+            wgpu::Extent3d {
+                width: ATLAS_SIZE,
+                height: ATLAS_SIZE,
+                depth_or_array_layers: 1,
+            },
+        );
+        self.vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("nvide-glyph-vertices"),
+                contents: &vertices,
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        self.index_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("nvide-glyph-indices"),
+                contents: &indices,
+                usage: wgpu::BufferUsages::INDEX,
+            });
+        self.index_count = u32::try_from(indices.len() / 4).map_err(|_| RenderError::AtlasFull)?;
+        Ok(())
+    }
+
+    pub fn render(&mut self) -> Result<(), RenderError> {
+        let frame = match self.surface.get_current_texture() {
+            Ok(frame) => frame,
+            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                self.surface.configure(&self.device, &self.config);
+                self.surface.get_current_texture().map_err(surface_error)?
+            }
+            Err(error) => return Err(surface_error(error)),
+        };
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("nvide-frame"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("nvide-clear-and-text"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.035,
+                            g: 0.04,
+                            b: 0.055,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            if self.index_count > 0 {
+                pass.set_pipeline(&self.pipeline);
+                pass.set_bind_group(0, &self.bind_group, &[]);
+                pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+                pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                pass.draw_indexed(0..self.index_count, 0, 0..1);
+            }
+        }
+        self.queue.submit([encoder.finish()]);
+        frame.present();
+        Ok(())
+    }
+}
+
+fn empty_buffer(device: &wgpu::Device, label: &str, usage: wgpu::BufferUsages) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some(label),
+        size: 4,
+        usage,
+        mapped_at_creation: false,
+    })
+}
+
+fn surface_error(error: wgpu::SurfaceError) -> RenderError {
+    match error {
+        wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated => RenderError::SurfaceLost,
+        wgpu::SurfaceError::Timeout => RenderError::Timeout,
+        wgpu::SurfaceError::OutOfMemory => RenderError::OutOfMemory,
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn build_atlas(
+    shaping: &ShapingBuffer,
+    font_system: &mut FontSystem,
+    cache: &mut SwashCache,
+    width: u32,
+    height: u32,
+) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), RenderError> {
+    let mut atlas = vec![0_u8; (ATLAS_SIZE * ATLAS_SIZE * 4) as usize];
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+    let mut atlas_x = 1_u32;
+    let mut atlas_y = 1_u32;
+    let mut row_height = 0_u32;
+    let mut glyph_index = 0_u32;
+
+    for run in shaping.layout_runs() {
+        for glyph in run.glyphs {
+            let physical = glyph.physical((0.0, 0.0), 1.0);
+            let Some(image) = cache.get_image(font_system, physical.cache_key).clone() else {
+                continue;
+            };
+            let glyph_width = image.placement.width;
+            let glyph_height = image.placement.height;
+            if glyph_width == 0 || glyph_height == 0 {
+                continue;
+            }
+            if atlas_x + glyph_width + 1 > ATLAS_SIZE {
+                atlas_x = 1;
+                atlas_y = atlas_y.saturating_add(row_height + 1);
+                row_height = 0;
+            }
+            if atlas_y + glyph_height + 1 > ATLAS_SIZE {
+                return Err(RenderError::AtlasFull);
+            }
+            row_height = row_height.max(glyph_height);
+            copy_glyph(&mut atlas, atlas_x, atlas_y, &image);
+
+            let x = physical.x + image.placement.left;
+            let y = run.line_y as i32 + physical.y - image.placement.top;
+            let x0 = pixel_to_ndc_x(x as f32, width);
+            let x1 = pixel_to_ndc_x((x + glyph_width as i32) as f32, width);
+            let y0 = pixel_to_ndc_y(y as f32, height);
+            let y1 = pixel_to_ndc_y((y + glyph_height as i32) as f32, height);
+            let u0 = atlas_x as f32 / ATLAS_SIZE as f32;
+            let u1 = (atlas_x + glyph_width) as f32 / ATLAS_SIZE as f32;
+            let v0 = atlas_y as f32 / ATLAS_SIZE as f32;
+            let v1 = (atlas_y + glyph_height) as f32 / ATLAS_SIZE as f32;
+            for vertex in [
+                [x0, y0, u0, v0],
+                [x1, y0, u1, v0],
+                [x1, y1, u1, v1],
+                [x0, y1, u0, v1],
+            ] {
+                for value in vertex {
+                    vertices.extend(value.to_ne_bytes());
+                }
+            }
+            for index in [0, 1, 2, 0, 2, 3] {
+                indices.extend((glyph_index * 4 + index).to_ne_bytes());
+            }
+            glyph_index = glyph_index.checked_add(1).ok_or(RenderError::AtlasFull)?;
+            atlas_x += glyph_width + 1;
+        }
+    }
+    Ok((atlas, vertices, indices))
+}
+
+fn copy_glyph(atlas: &mut [u8], x: u32, y: u32, image: &cosmic_text::SwashImage) {
+    let width = image.placement.width as usize;
+    let height = image.placement.height as usize;
+    for row in 0..height {
+        for column in 0..width {
+            let destination = ((y as usize + row) * ATLAS_SIZE as usize + x as usize + column) * 4;
+            match image.content {
+                SwashContent::Mask => {
+                    let alpha = image.data[row * width + column];
+                    atlas[destination..destination + 4].copy_from_slice(&[238, 241, 255, alpha]);
+                }
+                SwashContent::SubpixelMask | SwashContent::Color => {
+                    let source = (row * width + column) * 4;
+                    atlas[destination..destination + 4]
+                        .copy_from_slice(&image.data[source..source + 4]);
+                }
+            }
+        }
+    }
+}
+
+fn pixel_to_ndc_x(value: f32, width: u32) -> f32 {
+    value * 2.0 / width.max(1) as f32 - 1.0
+}
+
+fn pixel_to_ndc_y(value: f32, height: u32) -> f32 {
+    1.0 - value * 2.0 / height.max(1) as f32
+}
+
+pub fn shape_text(text: &str) -> usize {
+    let mut font_system = FontSystem::new();
+    let mut buffer = ShapingBuffer::new(&mut font_system, Metrics::new(16.0, 22.0));
+    buffer.set_size(&mut font_system, Some(800.0), Some(600.0));
+    buffer.set_text(&mut font_system, text, &Attrs::new(), Shaping::Advanced);
+    buffer.layout_runs().map(|run| run.glyphs.len()).sum()
+}
+
+fn block_on<F: Future>(future: F) -> F::Output {
+    struct ThreadWake(thread::Thread);
+    impl Wake for ThreadWake {
+        fn wake(self: Arc<Self>) {
+            self.0.unpark();
+        }
+
+        fn wake_by_ref(self: &Arc<Self>) {
+            self.0.unpark();
+        }
+    }
+
+    let waker = Waker::from(Arc::new(ThreadWake(thread::current())));
+    let mut context = Context::from_waker(&waker);
+    let mut future = Box::pin(future);
+    loop {
+        match future.as_mut().poll(&mut context) {
+            Poll::Ready(output) => return output,
+            Poll::Pending => thread::park(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cosmic_text_shapes_bidi_and_fallback_text() {
+        assert!(shape_text("NVide → λ مرحبا") > 5);
+    }
+
+    #[test]
+    fn coordinates_cover_the_surface() {
+        assert_eq!(pixel_to_ndc_x(0.0, 100), -1.0);
+        assert_eq!(pixel_to_ndc_x(100.0, 100), 1.0);
+        assert_eq!(pixel_to_ndc_y(0.0, 100), 1.0);
+        assert_eq!(pixel_to_ndc_y(100.0, 100), -1.0);
+    }
+}

@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: clippy
+      - run: cargo build --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
+      - run: cargo test --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
+      - run: cargo clippy --workspace --all-targets --all-features --locked --target ${{ matrix.target }} -- -D warnings
+
+  policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+      - run: cargo check --workspace --all-targets --all-features --locked
+      - run: cargo metadata --locked --format-version 1 > /dev/null
+      - name: Enforce Phase 0 crates and dependency edges
+        run: |
+          cargo metadata --locked --no-deps --format-version 1 | python3 -c '
+          import json, sys
+          metadata = json.load(sys.stdin)
+          expected = {"nvide", "nvide-core", "nvide-buffer", "nvide-platform", "nvide-ipc", "nvide-rpc-schema", "nvide-render", "nvide-ui"}
+          allowed = {
+              "nvide": {"nvide-buffer", "nvide-ipc", "nvide-ui", "nvide-rpc-schema"},
+              "nvide-core": {"nvide-buffer", "nvide-ipc"},
+              "nvide-buffer": set(),
+              "nvide-platform": set(),
+              "nvide-ipc": {"nvide-platform", "nvide-rpc-schema"},
+              "nvide-rpc-schema": set(),
+              "nvide-render": set(),
+              "nvide-ui": {"nvide-ipc", "nvide-platform", "nvide-render"},
+          }
+          packages = {package["name"]: package for package in metadata["packages"]}
+          assert set(packages) == expected, (set(packages), expected)
+          for name, package in packages.items():
+              local = {dependency["name"] for dependency in package["dependencies"] if dependency.get("path") is not None}
+              assert local == allowed[name], (name, local, allowed[name])
+          '
+      - run: cargo xtask schema check
+      - run: git diff --exit-code
+      - run: cargo xtask evidence check --phase 0
+
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly-2026-07-01
+      - run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - run: cargo fuzz run buffer -- -runs=1000
+      - run: cargo fuzz run nrpc -- -runs=1000

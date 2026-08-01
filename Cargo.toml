@@ -1,0 +1,38 @@
+[workspace]
+members = [
+    "crates/nvide",
+    "crates/nvide-buffer",
+    "crates/nvide-core",
+    "crates/nvide-ipc",
+    "crates/nvide-platform",
+    "crates/nvide-render",
+    "crates/nvide-rpc-schema",
+    "crates/nvide-ui",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[workspace.dependencies]
+capnp = "=0.26.2"
+capnpc = "=0.26.0"
+cosmic-text = "=0.14.2"
+ropey = { version = "=1.6.1", default-features = false, features = ["simd"] }
+wgpu = "=23.0.1"
+winit = "=0.30.13"
+windows-sys = "=0.52.0"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[profile.release]
+lto = "thin"

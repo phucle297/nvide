@@ -1,0 +1,15 @@
+[package]
+name = "nvide-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+nvide-ipc = { path = "../nvide-ipc" }
+nvide-platform = { path = "../nvide-platform" }
+nvide-render = { path = "../nvide-render" }
+winit.workspace = true
+
+[lints]
+workspace = true

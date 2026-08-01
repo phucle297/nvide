@@ -1,0 +1,13 @@
+[package]
+name = "nvide-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+nvide-buffer = { path = "../nvide-buffer" }
+nvide-ipc = { path = "../nvide-ipc" }
+
+[lints]
+workspace = true
