@@ -41,6 +41,7 @@ impl CoreState {
         &mut self,
         request: schema::EditRequest,
     ) -> Result<schema::ViewportSnapshot, schema::RpcError> {
+        let core_received_ns = nvide_platform_clock()?;
         if request.expected_version != self.buffer.version() {
             return Err(invalid_argument(format!(
                 "stale buffer version {}; expected {}",
@@ -68,12 +69,23 @@ impl CoreState {
                 },
             )
             .map_err(|error| invalid_argument(error.to_string()))?;
+        let version_increment_ns = nvide_platform_clock()?;
         Ok(schema::ViewportSnapshot {
             trace_id: request.trace_id,
             version: outcome.version,
             text: self.buffer.text(),
+            core_received_ns,
+            version_increment_ns,
+            viewport_emit_ns: nvide_platform_clock()?,
         })
     }
+}
+
+fn nvide_platform_clock() -> Result<u64, schema::RpcError> {
+    nvide_ipc::platform_monotonic_ns().map_err(|error| schema::RpcError {
+        code: schema::ErrorCode::Internal,
+        message: error.to_string(),
+    })
 }
 
 fn invalid_argument(message: String) -> schema::RpcError {
@@ -95,6 +107,7 @@ mod tests {
             expected_version: 0,
             char_offset: 0,
             text: "a".to_owned(),
+            dispatch_ns: 1,
         })?;
         assert_eq!((first.version, first.text.as_str()), (1, "a"));
         assert!(core
@@ -103,6 +116,7 @@ mod tests {
                 expected_version: 0,
                 char_offset: 1,
                 text: "b".to_owned(),
+                dispatch_ns: 2,
             })
             .is_err());
         Ok(())

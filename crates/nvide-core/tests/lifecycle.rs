@@ -20,6 +20,7 @@ fn core_failure_restarts_and_rebinds_over_local_transport() -> Result<(), Box<dy
         expected_version: 0,
         char_offset: 0,
         text: "restart-ok".to_owned(),
+        dispatch_ns: nvide_ipc::platform_monotonic_ns()?,
     })?;
     assert_eq!((viewport.trace_id, viewport.version), (7, 1));
     assert_eq!(viewport.text, "restart-ok");

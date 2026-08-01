@@ -926,8 +926,6 @@ dependencies = [
 name = "nvide"
 version = "0.1.0"
 dependencies = [
- "nvide-buffer",
- "nvide-ipc",
  "nvide-rpc-schema",
  "nvide-ui",
 ]
@@ -959,6 +957,7 @@ dependencies = [
 name = "nvide-platform"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "windows-sys 0.52.0",
 ]
 
@@ -967,6 +966,7 @@ name = "nvide-render"
 version = "0.1.0"
 dependencies = [
  "cosmic-text",
+ "nvide-platform",
  "wgpu",
 ]
 

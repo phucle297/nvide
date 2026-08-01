@@ -40,6 +40,7 @@ pub struct EditRequest {
     pub expected_version: u64,
     pub char_offset: u64,
     pub text: String,
+    pub dispatch_ns: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -47,6 +48,9 @@ pub struct ViewportSnapshot {
     pub trace_id: u64,
     pub version: u64,
     pub text: String,
+    pub core_received_ns: u64,
+    pub version_increment_ns: u64,
+    pub viewport_emit_ns: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -170,6 +174,7 @@ pub fn encode_edit(value: &EditRequest) -> Vec<u8> {
     root.set_expected_version(value.expected_version);
     root.set_char_offset(value.char_offset);
     root.set_text(value.text.as_str());
+    root.set_dispatch_ns(value.dispatch_ns);
     serialize::write_message_to_words(&message)
 }
 
@@ -185,6 +190,7 @@ pub fn decode_edit(bytes: &[u8]) -> Result<EditRequest, SchemaError> {
             .to_str()
             .map_err(|_| SchemaError::InvalidUtf8)?
             .to_owned(),
+        dispatch_ns: root.get_dispatch_ns(),
     })
 }
 
@@ -194,6 +200,9 @@ pub fn encode_viewport(value: &ViewportSnapshot) -> Vec<u8> {
     root.set_trace_id(value.trace_id);
     root.set_version(value.version);
     root.set_text(value.text.as_str());
+    root.set_core_received_ns(value.core_received_ns);
+    root.set_version_increment_ns(value.version_increment_ns);
+    root.set_viewport_emit_ns(value.viewport_emit_ns);
     serialize::write_message_to_words(&message)
 }
 
@@ -208,6 +217,9 @@ pub fn decode_viewport(bytes: &[u8]) -> Result<ViewportSnapshot, SchemaError> {
             .to_str()
             .map_err(|_| SchemaError::InvalidUtf8)?
             .to_owned(),
+        core_received_ns: root.get_core_received_ns(),
+        version_increment_ns: root.get_version_increment_ns(),
+        viewport_emit_ns: root.get_viewport_emit_ns(),
     })
 }
 
@@ -295,8 +307,19 @@ mod tests {
             expected_version: 2,
             char_offset: 1,
             text: "λ".to_owned(),
+            dispatch_ns: 11,
         };
         assert_eq!(decode_edit(&encode_edit(&edit))?, edit);
+
+        let viewport = ViewportSnapshot {
+            trace_id: 7,
+            version: 3,
+            text: "λ".to_owned(),
+            core_received_ns: 12,
+            version_increment_ns: 13,
+            viewport_emit_ns: 14,
+        };
+        assert_eq!(decode_viewport(&encode_viewport(&viewport))?, viewport);
         Ok(())
     }
 }

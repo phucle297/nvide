@@ -178,7 +178,10 @@ fn ensure_compiler(root: &Path) -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn version_contains(program: &Path, expected: &str) -> Result<bool, Box<dyn Error>> {
-    Ok(checked_output(program, ["--version"], None)?.contains(expected))
+    Ok(checked_output(program, ["--version"], None)?
+        .lines()
+        .next()
+        .is_some_and(|line| line == format!("Cap'n Proto version {expected}")))
 }
 
 fn checked<I, S>(

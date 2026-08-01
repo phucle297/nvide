@@ -29,9 +29,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
           components: clippy
-      - run: cargo build --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
-      - run: cargo test --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
-      - run: cargo clippy --workspace --all-targets --all-features --locked --target ${{ matrix.target }} -- -D warnings
+      - uses: dtolnay/rust-toolchain@1.82.0
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo +1.82.0 check --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
+      - run: cargo +stable build --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
+      - run: cargo +stable test --workspace --all-targets --all-features --locked --target ${{ matrix.target }}
+      - run: cargo +stable clippy --workspace --all-targets --all-features --locked --target ${{ matrix.target }} -- -D warnings
 
   policy:
     runs-on: ubuntu-24.04
@@ -50,13 +54,13 @@ jobs:
           metadata = json.load(sys.stdin)
           expected = {"nvide", "nvide-core", "nvide-buffer", "nvide-platform", "nvide-ipc", "nvide-rpc-schema", "nvide-render", "nvide-ui"}
           allowed = {
-              "nvide": {"nvide-buffer", "nvide-ipc", "nvide-ui", "nvide-rpc-schema"},
+              "nvide": {"nvide-ui", "nvide-rpc-schema"},
               "nvide-core": {"nvide-buffer", "nvide-ipc"},
               "nvide-buffer": set(),
               "nvide-platform": set(),
               "nvide-ipc": {"nvide-platform", "nvide-rpc-schema"},
               "nvide-rpc-schema": set(),
-              "nvide-render": set(),
+              "nvide-render": {"nvide-platform"},
               "nvide-ui": {"nvide-ipc", "nvide-platform", "nvide-render"},
           }
           packages = {package["name"]: package for package in metadata["packages"]}

@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub use nvide_platform::{LocalListener, LocalStream};
+pub use nvide_platform::{monotonic_ns as platform_monotonic_ns, LocalListener, LocalStream};
 
 pub const HEADER_LEN: usize = 10;
 pub const MAX_PAYLOAD: usize = 16 * 1024 * 1024;
@@ -239,6 +239,7 @@ pub struct Session {
     remote_allocated: BTreeSet<u32>,
     remote_open: BTreeSet<u32>,
     remote_cancelled: BTreeSet<u32>,
+    remote_terminal: BTreeSet<u32>,
 }
 
 impl Session {
@@ -257,6 +258,7 @@ impl Session {
             remote_allocated: BTreeSet::new(),
             remote_open: BTreeSet::new(),
             remote_cancelled: BTreeSet::new(),
+            remote_terminal: BTreeSet::new(),
         }
     }
 
@@ -434,9 +436,7 @@ impl Session {
 
     pub fn response(&mut self, stream: u32, payload: Vec<u8>) -> Result<Frame, ProtocolError> {
         self.require_established()?;
-        if !self.remote_open.remove(&stream) && !self.remote_cancelled.contains(&stream) {
-            return Err(ProtocolError::InvalidStream(stream));
-        }
+        self.finish_remote(stream)?;
         Frame::new(stream, RESP, payload)
     }
 
@@ -446,9 +446,7 @@ impl Session {
         error: schema::RpcError,
     ) -> Result<Frame, ProtocolError> {
         self.require_established()?;
-        if !self.remote_open.remove(&stream) {
-            return Err(ProtocolError::InvalidStream(stream));
-        }
+        self.finish_remote(stream)?;
         Frame::new(
             stream,
             RESP | ERR,
@@ -474,6 +472,16 @@ impl Session {
         }
         self.remote_high_water = stream;
         self.remote_allocated.insert(stream);
+        Ok(())
+    }
+
+    fn finish_remote(&mut self, stream: u32) -> Result<(), ProtocolError> {
+        if self.remote_terminal.contains(&stream)
+            || !self.remote_open.remove(&stream) && !self.remote_cancelled.contains(&stream)
+        {
+            return Err(ProtocolError::InvalidStream(stream));
+        }
+        self.remote_terminal.insert(stream);
         Ok(())
     }
 
@@ -807,6 +815,7 @@ mod tests {
         listener.accept_frame(second.clone())?;
         listener.accept_frame(connector.cancel(second.stream_id)?)?;
         let raced = listener.response(second.stream_id, Vec::new())?;
+        assert!(listener.response(second.stream_id, Vec::new()).is_err());
         assert!(connector.accept_frame(raced)?.is_none());
         assert!(listener
             .accept_frame(Frame::new(4, REQ, Vec::new())?)
@@ -876,6 +885,7 @@ mod tests {
                 expected_version: 0,
                 char_offset: 0,
                 text: "x".to_owned(),
+                dispatch_ns: 1,
             }),
             Err(ProtocolError::RequestTimeout(1))
         ));
@@ -906,6 +916,9 @@ mod tests {
                     trace_id: edit.trace_id,
                     version: edit.expected_version + 1,
                     text: edit.text,
+                    core_received_ns: edit.dispatch_ns + 1,
+                    version_increment_ns: edit.dispatch_ns + 2,
+                    viewport_emit_ns: edit.dispatch_ns + 3,
                 })
             })
         });
@@ -916,6 +929,7 @@ mod tests {
             expected_version: 0,
             char_offset: 0,
             text: "x".to_owned(),
+            dispatch_ns: 1,
         })?;
         assert_eq!(viewport.version, 1);
         drop(client);

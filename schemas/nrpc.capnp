@@ -46,12 +46,16 @@ struct EditRequest {
   expectedVersion @1 :UInt64;
   charOffset @2 :UInt64;
   text @3 :Text;
+  dispatchNs @4 :UInt64;
 }
 
 struct ViewportSnapshot {
   traceId @0 :UInt64;
   version @1 :UInt64;
   text @2 :Text;
+  coreReceivedNs @3 :UInt64;
+  versionIncrementNs @4 :UInt64;
+  viewportEmitNs @5 :UInt64;
 }
 
 struct Heartbeat {

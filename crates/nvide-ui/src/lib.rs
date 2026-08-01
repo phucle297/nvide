@@ -8,7 +8,10 @@ use std::{
     fmt, fs,
     path::PathBuf,
     process::{Child, Command, Stdio},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 use winit::{
@@ -22,6 +25,7 @@ use winit::{
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
 const MAX_RESTARTS: usize = 3;
+const EDIT_SENTINELS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 #[derive(Debug)]
 pub struct UiError(String);
@@ -37,16 +41,23 @@ impl Error for UiError {}
 pub fn run() -> Result<(), UiError> {
     let options = RunOptions::parse(env::args().skip(1))?;
     let event_loop = EventLoop::new().map_err(display_error)?;
-    event_loop.set_control_flow(if options.benchmark.is_some() {
-        ControlFlow::Poll
-    } else {
-        ControlFlow::Wait
-    });
+    event_loop.set_control_flow(idle_control_flow(
+        options.benchmark.is_some(),
+        Instant::now() + HEARTBEAT_INTERVAL,
+    ));
     let mut app = App::new(options);
     event_loop.run_app(&mut app).map_err(display_error)?;
     match app.failure.take() {
         Some(failure) => Err(UiError(failure)),
         None => Ok(()),
+    }
+}
+
+fn idle_control_flow(benchmark: bool, next_heartbeat: Instant) -> ControlFlow {
+    if benchmark {
+        ControlFlow::Poll
+    } else {
+        ControlFlow::WaitUntil(next_heartbeat)
     }
 }
 
@@ -123,7 +134,9 @@ impl ApplicationHandler for App {
             }
         }
         if let Some(benchmark) = self.benchmark.as_mut() {
-            benchmark.start();
+            if let Err(error) = benchmark.start() {
+                return self.fail(event_loop, error);
+            }
         }
         self.renderer = Some(renderer);
         self.window = Some(window.clone());
@@ -156,20 +169,35 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
+                let capture = self
+                    .benchmark
+                    .as_ref()
+                    .is_some_and(Benchmark::needs_readback);
                 if let Some(renderer) = self.renderer.as_mut() {
-                    if let Err(error) = renderer.render() {
-                        self.handle_render_error(event_loop, error);
-                        return;
+                    match renderer.render(capture) {
+                        Ok(frame) => self.after_present(event_loop, frame),
+                        Err(error) => self.handle_render_error(event_loop, error),
                     }
                 }
-                self.after_present(event_loop);
             }
             _ => {}
         }
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self
+            .benchmark
+            .as_ref()
+            .is_some_and(Benchmark::pending_timed_out)
+        {
+            self.fail(event_loop, "benchmark edit timed out after five seconds");
+            return;
+        }
         if self.last_heartbeat.elapsed() < HEARTBEAT_INTERVAL {
+            event_loop.set_control_flow(idle_control_flow(
+                self.benchmark.is_some(),
+                self.last_heartbeat + HEARTBEAT_INTERVAL,
+            ));
             return;
         }
         self.last_heartbeat = Instant::now();
@@ -195,6 +223,10 @@ impl ApplicationHandler for App {
             }
             Some(CoreHealth::Healthy | CoreHealth::Missed) | None => {}
         }
+        event_loop.set_control_flow(idle_control_flow(
+            self.benchmark.is_some(),
+            self.last_heartbeat + HEARTBEAT_INTERVAL,
+        ));
     }
 }
 
@@ -211,12 +243,11 @@ impl App {
         }
     }
 
-    fn after_present(&mut self, event_loop: &ActiveEventLoop) {
-        let now = Instant::now();
+    fn after_present(&mut self, event_loop: &ActiveEventLoop, frame: nvide_render::PresentedFrame) {
         let action = self
             .benchmark
             .as_mut()
-            .map(|benchmark| benchmark.presented(now));
+            .map(|benchmark| benchmark.presented(frame));
         match action {
             Some(BenchmarkAction::Continue) => {
                 if let Some(window) = self.window.as_ref() {
@@ -233,6 +264,8 @@ impl App {
                 if let Some(benchmark) = self.benchmark.as_ref() {
                     if let Err(error) = benchmark.write_artifact() {
                         self.failure = Some(error.to_string());
+                    } else if let Some(failure) = benchmark.failure_message() {
+                        self.failure = Some(failure.to_owned());
                     }
                 }
                 event_loop.exit();
@@ -242,11 +275,18 @@ impl App {
     }
 
     fn dispatch_benchmark_edit(&mut self, event_loop: &ActiveEventLoop) {
-        let Some((trace_id, character, measured, dispatch_ns)) =
+        let Some((trace_id, character, measured)) =
             self.benchmark.as_mut().and_then(Benchmark::next_edit)
         else {
             return;
         };
+        let dispatch_ns = match nvide_platform::monotonic_ns() {
+            Ok(timestamp) => timestamp,
+            Err(error) => return self.fail(event_loop, error),
+        };
+        if let Some(benchmark) = self.benchmark.as_mut() {
+            benchmark.edit_dispatched(trace_id, character, measured, dispatch_ns);
+        }
         let Some(core) = self.core.as_mut() else {
             return self.fail(event_loop, "benchmark edit requires the core process");
         };
@@ -255,30 +295,26 @@ impl App {
             expected_version: self.version,
             char_offset: self.text.chars().count() as u64,
             text: character.to_string(),
+            dispatch_ns,
         };
         match core.edit(&request) {
             Ok(viewport)
                 if viewport.trace_id == trace_id && viewport.version == self.version + 1 =>
             {
                 self.version = viewport.version;
-                self.text = viewport.text;
-                let viewport_ns = self
-                    .benchmark
-                    .as_ref()
-                    .map(Benchmark::elapsed_ns)
-                    .unwrap_or(dispatch_ns);
+                let viewport_receive_ns = match nvide_platform::monotonic_ns() {
+                    Ok(timestamp) => timestamp,
+                    Err(error) => return self.fail(event_loop, error),
+                };
                 if let Some(benchmark) = self.benchmark.as_mut() {
-                    benchmark.edit_received(
-                        trace_id,
-                        self.version,
-                        measured,
-                        dispatch_ns,
-                        viewport_ns,
-                    );
+                    benchmark.edit_received(trace_id, self.version, &viewport, viewport_receive_ns);
                 }
+                self.text = viewport.text;
                 if let Some(renderer) = self.renderer.as_mut() {
                     if let Err(error) = renderer.set_text(&self.text) {
                         self.handle_render_error(event_loop, error);
+                    } else if let Some(benchmark) = self.benchmark.as_mut() {
+                        benchmark.shaped(trace_id, renderer.glyph_count(), &self.text);
                     }
                 }
             }
@@ -297,6 +333,10 @@ impl App {
             expected_version: self.version,
             char_offset: self.text.chars().count() as u64,
             text: text.to_owned(),
+            dispatch_ns: match nvide_platform::monotonic_ns() {
+                Ok(timestamp) => timestamp,
+                Err(error) => return self.fail(event_loop, error),
+            },
         };
         match core.edit(&request) {
             Ok(viewport)
@@ -331,6 +371,9 @@ impl App {
         error: nvide_render::RenderError,
     ) {
         match error {
+            nvide_render::RenderError::Timeout if self.benchmark.is_some() => {
+                self.fail(event_loop, "benchmark render surface timed out");
+            }
             nvide_render::RenderError::Timeout => {}
             nvide_render::RenderError::SurfaceLost => {
                 if let Some(window) = self.window.as_ref() {
@@ -341,13 +384,25 @@ impl App {
                         }
                     }
                 }
+                if let Some(window) = self.window.as_ref() {
+                    window.request_redraw();
+                }
             }
             fatal => self.fail(event_loop, fatal),
         }
     }
 
     fn fail(&mut self, event_loop: &ActiveEventLoop, error: impl fmt::Display) {
-        self.failure = Some(error.to_string());
+        let message = error.to_string();
+        if let Some(benchmark) = self.benchmark.as_mut() {
+            benchmark.record_failure(&message);
+            if let Err(write_error) = benchmark.write_artifact() {
+                self.failure = Some(format!("{message}; artifact write failed: {write_error}"));
+                event_loop.exit();
+                return;
+            }
+        }
+        self.failure = Some(message);
         event_loop.exit();
     }
 }
@@ -375,20 +430,34 @@ impl RunOptions {
                 run_id,
                 output,
                 started: None,
+                started_ns: None,
                 warmup: Duration::from_secs(number(&args, "--warmup-seconds")?),
                 measure: Duration::from_secs(number(&args, "--measure-seconds")?),
                 frames: Vec::new(),
+                failure: None,
             },
-            "edit" => Benchmark::Edit {
-                run_id,
-                output,
-                started: None,
-                warmup_edits: number(&args, "--warmup-edits")? as usize,
-                measure_edits: number(&args, "--measure-edits")? as usize,
-                dispatched: 0,
-                pending: None,
-                traces: Vec::new(),
-            },
+            "edit" => {
+                let warmup_edits = count(&args, "--warmup-edits")?;
+                let measure_edits = count(&args, "--measure-edits")?;
+                if warmup_edits.saturating_add(measure_edits) > EDIT_SENTINELS.len() {
+                    return Err(UiError(format!(
+                        "edit benchmark supports at most {} unique sentinels",
+                        EDIT_SENTINELS.len()
+                    )));
+                }
+                Benchmark::Edit {
+                    run_id,
+                    output,
+                    started: None,
+                    started_ns: None,
+                    warmup_edits,
+                    measure_edits,
+                    dispatched: 0,
+                    pending: None,
+                    traces: Vec::new(),
+                    failure: None,
+                }
+            }
             _ => return Err(UiError(format!("unknown benchmark kind {kind}"))),
         };
         Ok(Self {
@@ -402,29 +471,47 @@ enum Benchmark {
         run_id: String,
         output: PathBuf,
         started: Option<Instant>,
+        started_ns: Option<u64>,
         warmup: Duration,
         measure: Duration,
-        frames: Vec<u128>,
+        frames: Vec<ClearFrame>,
+        failure: Option<String>,
     },
     Edit {
         run_id: String,
         output: PathBuf,
         started: Option<Instant>,
+        started_ns: Option<u64>,
         warmup_edits: usize,
         measure_edits: usize,
         dispatched: usize,
         pending: Option<Trace>,
         traces: Vec<Trace>,
+        failure: Option<String>,
     },
 }
 
+struct ClearFrame {
+    sequence: u64,
+    present_ns: u64,
+}
+
 struct Trace {
+    started: Instant,
     trace_id: u64,
-    version: u64,
+    version: Option<u64>,
     measured: bool,
-    dispatch_ns: u128,
-    viewport_ns: u128,
-    present_ns: Option<u128>,
+    sentinel: char,
+    dispatch_ns: u64,
+    core_received_ns: Option<u64>,
+    version_increment_ns: Option<u64>,
+    viewport_emit_ns: Option<u64>,
+    viewport_receive_ns: Option<u64>,
+    shaped_glyphs: Option<usize>,
+    sentinel_shaped: bool,
+    frame_sequence: Option<u64>,
+    present_ns: Option<u64>,
+    readback: Option<nvide_render::FrameReadback>,
 }
 
 enum BenchmarkAction {
@@ -434,23 +521,41 @@ enum BenchmarkAction {
 }
 
 impl Benchmark {
-    fn start(&mut self) {
+    fn start(&mut self) -> Result<(), UiError> {
+        let started_ns = nvide_platform::monotonic_ns().map_err(display_error)?;
         match self {
-            Self::Clear { started, .. } | Self::Edit { started, .. } => {
-                *started = Some(Instant::now())
+            Self::Clear {
+                started,
+                started_ns: timestamp,
+                ..
+            }
+            | Self::Edit {
+                started,
+                started_ns: timestamp,
+                ..
+            } => {
+                *started = Some(Instant::now());
+                *timestamp = Some(started_ns);
             }
         }
+        Ok(())
     }
 
-    fn elapsed_ns(&self) -> u128 {
-        match self {
-            Self::Clear { started, .. } | Self::Edit { started, .. } => {
-                started.map(|start| start.elapsed().as_nanos()).unwrap_or(0)
+    fn needs_readback(&self) -> bool {
+        matches!(
+            self,
+            Self::Edit {
+                pending: Some(_),
+                ..
             }
-        }
+        )
     }
 
-    fn presented(&mut self, now: Instant) -> BenchmarkAction {
+    fn pending_timed_out(&self) -> bool {
+        matches!(self, Self::Edit { pending: Some(trace), .. } if trace.started.elapsed() >= Duration::from_secs(5))
+    }
+
+    fn presented(&mut self, mut frame: nvide_render::PresentedFrame) -> BenchmarkAction {
         match self {
             Self::Clear {
                 started,
@@ -459,11 +564,12 @@ impl Benchmark {
                 frames,
                 ..
             } => {
-                let elapsed = started
-                    .map(|start| now.duration_since(start))
-                    .unwrap_or_default();
+                let elapsed = started.map(|start| start.elapsed()).unwrap_or_default();
                 if elapsed >= *warmup && elapsed < *warmup + *measure {
-                    frames.push(elapsed.as_nanos());
+                    frames.push(ClearFrame {
+                        sequence: frame.sequence,
+                        present_ns: frame.present_ns,
+                    });
                 }
                 if elapsed >= *warmup + *measure {
                     BenchmarkAction::Finish
@@ -477,11 +583,19 @@ impl Benchmark {
                 dispatched,
                 pending,
                 traces,
-                started,
+                failure,
                 ..
             } => {
                 if let Some(mut trace) = pending.take() {
-                    trace.present_ns = started.map(|start| now.duration_since(start).as_nanos());
+                    trace.frame_sequence = Some(frame.sequence);
+                    trace.present_ns = Some(frame.present_ns);
+                    trace.readback = frame.readback.take();
+                    if !trace.sentinel_shaped || trace.readback.is_none() {
+                        *failure = Some(format!(
+                            "trace {} lacks shaped sentinel or frame readback",
+                            trace.trace_id
+                        ));
+                    }
                     if trace.measured {
                         traces.push(trace);
                     }
@@ -495,7 +609,7 @@ impl Benchmark {
         }
     }
 
-    fn next_edit(&mut self) -> Option<(u64, char, bool, u128)> {
+    fn next_edit(&mut self) -> Option<(u64, char, bool)> {
         let Self::Edit {
             warmup_edits,
             measure_edits,
@@ -510,76 +624,189 @@ impl Benchmark {
         }
         let index = *dispatched;
         *dispatched += 1;
-        let character = char::from(b'!' + (index % 90) as u8);
-        Some((
-            *dispatched as u64,
-            character,
-            index >= *warmup_edits,
-            self.elapsed_ns(),
-        ))
+        let character = char::from(EDIT_SENTINELS[index]);
+        Some((*dispatched as u64, character, index >= *warmup_edits))
+    }
+
+    fn edit_dispatched(&mut self, trace_id: u64, sentinel: char, measured: bool, dispatch_ns: u64) {
+        if let Self::Edit { pending, .. } = self {
+            *pending = Some(Trace {
+                started: Instant::now(),
+                trace_id,
+                version: None,
+                measured,
+                sentinel,
+                dispatch_ns,
+                core_received_ns: None,
+                version_increment_ns: None,
+                viewport_emit_ns: None,
+                viewport_receive_ns: None,
+                shaped_glyphs: None,
+                sentinel_shaped: false,
+                frame_sequence: None,
+                present_ns: None,
+                readback: None,
+            });
+        }
     }
 
     fn edit_received(
         &mut self,
         trace_id: u64,
         version: u64,
-        measured: bool,
-        dispatch_ns: u128,
-        viewport_ns: u128,
+        viewport: &schema::ViewportSnapshot,
+        viewport_receive_ns: u64,
     ) {
+        if let Self::Edit {
+            pending, failure, ..
+        } = self
+        {
+            let Some(trace) = pending.as_mut().filter(|trace| trace.trace_id == trace_id) else {
+                *failure = Some(format!("trace {trace_id} has no matching dispatch"));
+                return;
+            };
+            trace.version = Some(version);
+            trace.core_received_ns = Some(viewport.core_received_ns);
+            trace.version_increment_ns = Some(viewport.version_increment_ns);
+            trace.viewport_emit_ns = Some(viewport.viewport_emit_ns);
+            trace.viewport_receive_ns = Some(viewport_receive_ns);
+            if !(trace.dispatch_ns <= viewport.core_received_ns
+                && viewport.core_received_ns <= viewport.version_increment_ns
+                && viewport.version_increment_ns <= viewport.viewport_emit_ns
+                && viewport.viewport_emit_ns <= viewport_receive_ns)
+            {
+                *failure = Some(format!("trace {trace_id} has unordered timestamps"));
+            }
+        }
+    }
+
+    fn shaped(&mut self, trace_id: u64, glyphs: usize, text: &str) {
         if let Self::Edit { pending, .. } = self {
-            *pending = Some(Trace {
-                trace_id,
-                version,
-                measured,
-                dispatch_ns,
-                viewport_ns,
-                present_ns: None,
-            });
+            if let Some(trace) = pending.as_mut().filter(|trace| trace.trace_id == trace_id) {
+                trace.shaped_glyphs = Some(glyphs);
+                trace.sentinel_shaped = glyphs > 0 && text.contains(trace.sentinel);
+            }
+        }
+    }
+
+    fn record_failure(&mut self, message: &str) {
+        let failure = match self {
+            Self::Clear { failure, .. } | Self::Edit { failure, .. } => failure,
+        };
+        *failure = Some(message.replace(['\n', '\r'], " "));
+    }
+
+    fn failure_message(&self) -> Option<&str> {
+        match self {
+            Self::Clear { failure, .. } | Self::Edit { failure, .. } => failure.as_deref(),
         }
     }
 
     fn write_artifact(&self) -> Result<(), UiError> {
-        let (run_id, output) = match self {
+        let (run_id, output_directory) = match self {
             Self::Clear { run_id, output, .. } | Self::Edit { run_id, output, .. } => {
                 (run_id, output)
             }
         };
-        fs::create_dir_all(output).map_err(display_error)?;
+        fs::create_dir_all(output_directory).map_err(display_error)?;
+        let failure = match self {
+            Self::Clear { failure, .. } | Self::Edit { failure, .. } => failure,
+        };
         let mut manifest = format!(
-            "format=nvide-phase0-runtime-v1\nrun_id={run_id}\nstatus=UNBOUND_DIAGNOSTIC\npid={}\n",
+            "format=nvide-phase0-runtime-v2\nrun_id={run_id}\nstatus={}\npid={}\n",
+            if failure.is_some() {
+                "FAILED_DIAGNOSTIC"
+            } else {
+                "UNBOUND_DIAGNOSTIC"
+            },
             std::process::id()
         );
+        if let Some(failure) = failure {
+            manifest.push_str(&format!("failure={failure}\n"));
+        }
         let runtime = match self {
-            Self::Clear { frames, .. } => {
+            Self::Clear {
+                frames,
+                started_ns,
+                warmup,
+                measure,
+                ..
+            } => {
                 manifest.push_str("kind=clear\n");
-                let mut output = "frame,present_call_ns\n".to_owned();
-                for (index, timestamp) in frames.iter().enumerate() {
-                    output.push_str(&format!("{},{}\n", index + 1, timestamp));
+                if let Some(started_ns) = started_ns {
+                    let warmup_ns = warmup.as_nanos().min(u128::from(u64::MAX)) as u64;
+                    let measure_ns = measure.as_nanos().min(u128::from(u64::MAX)) as u64;
+                    let measurement_start = started_ns.saturating_add(warmup_ns);
+                    manifest.push_str(&format!(
+                        "measurement_start_ns={measurement_start}\nmeasurement_end_ns={}\n",
+                        measurement_start.saturating_add(measure_ns)
+                    ));
+                }
+                let mut output = "frame_sequence,present_call_ns\n".to_owned();
+                for frame in frames {
+                    output.push_str(&format!("{},{}\n", frame.sequence, frame.present_ns));
                 }
                 output
             }
-            Self::Edit { traces, .. } => {
+            Self::Edit {
+                traces,
+                pending,
+                started_ns,
+                ..
+            } => {
                 manifest.push_str("kind=edit\n");
-                let mut output =
-                    "trace_id,version,dispatch_ns,viewport_ns,present_call_ns\n".to_owned();
-                for trace in traces {
+                if let Some(started_ns) = started_ns {
+                    manifest.push_str(&format!("run_start_ns={started_ns}\n"));
+                }
+                let mut output = "trace_id,version,measured,sentinel,dispatch_ns,core_received_ns,version_increment_ns,viewport_emit_ns,viewport_receive_ns,shaped_glyphs,sentinel_shaped,frame_sequence,present_call_ns,readback\n".to_owned();
+                for trace in traces.iter().chain(pending.iter()) {
+                    let readback_name = trace
+                        .frame_sequence
+                        .filter(|_| trace.readback.is_some())
+                        .map(|sequence| format!("frame-{sequence}.rgba"))
+                        .unwrap_or_default();
                     output.push_str(&format!(
-                        "{},{},{},{},{}\n",
+                        "{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
                         trace.trace_id,
-                        trace.version,
+                        optional(trace.version),
+                        trace.measured,
+                        trace.sentinel,
                         trace.dispatch_ns,
-                        trace.viewport_ns,
-                        trace.present_ns.unwrap_or(0)
+                        optional(trace.core_received_ns),
+                        optional(trace.version_increment_ns),
+                        optional(trace.viewport_emit_ns),
+                        optional(trace.viewport_receive_ns),
+                        optional(trace.shaped_glyphs),
+                        trace.sentinel_shaped,
+                        optional(trace.frame_sequence),
+                        optional(trace.present_ns),
+                        readback_name
                     ));
+                    if let (Some(readback), Some(sequence)) =
+                        (trace.readback.as_ref(), trace.frame_sequence)
+                    {
+                        fs::write(
+                            output_directory.join(format!("frame-{sequence}.rgba")),
+                            &readback.rgba,
+                        )
+                        .map_err(display_error)?;
+                        manifest.push_str(&format!(
+                            "frame_{sequence}_readback={}x{}-rgba8\n",
+                            readback.width, readback.height
+                        ));
+                    }
                 }
                 output
             }
         };
-        fs::write(output.join("manifest.txt"), manifest).map_err(display_error)?;
-        fs::write(output.join("runtime.csv"), runtime).map_err(display_error)?;
+        fs::write(output_directory.join("manifest.txt"), manifest).map_err(display_error)?;
+        fs::write(output_directory.join("runtime.csv"), runtime).map_err(display_error)?;
         Ok(())
     }
+}
+
+fn optional(value: Option<impl fmt::Display>) -> String {
+    value.map(|value| value.to_string()).unwrap_or_default()
 }
 
 fn value(args: &[String], flag: &str) -> Result<String, UiError> {
@@ -596,6 +823,10 @@ fn number(args: &[String], flag: &str) -> Result<u64, UiError> {
     value(args, flag)?
         .parse()
         .map_err(|_| UiError(format!("invalid integer for {flag}")))
+}
+
+fn count(args: &[String], flag: &str) -> Result<usize, UiError> {
+    usize::try_from(number(args, flag)?).map_err(|_| UiError(format!("{flag} is too large")))
 }
 
 struct CoreSupervisor {
@@ -728,33 +959,50 @@ fn spawn_core(
     listener: &nvide_ipc::LocalListener,
 ) -> Result<(Child, nvide_ipc::Client<nvide_ipc::LocalStream>), UiError> {
     let mut process = Command::new(&command.executable);
-    if command.self_hosted {
-        process.arg("--phase0-core");
+    process.args(&command.arguments);
+    if command.endpoint_via_env {
+        process.env(nvide_platform::NRPC_ENDPOINT_ENV, endpoint);
+    } else {
+        process.arg("--endpoint").arg(endpoint);
     }
-    let child = process
-        .arg("--endpoint")
-        .arg(endpoint)
+    let mut child = process
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()
         .map_err(display_error)?;
-    let stream = listener.accept().map_err(display_error)?;
-    let client = nvide_ipc::Client::connect(stream, schema::Role::Ui).map_err(display_error)?;
+    let stream = match listener.accept() {
+        Ok(stream) => stream,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(display_error(error));
+        }
+    };
+    let client = match nvide_ipc::Client::connect(stream, schema::Role::Ui) {
+        Ok(client) => client,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(display_error(error));
+        }
+    };
     Ok((child, client))
 }
 
 #[derive(Clone)]
 struct CoreCommand {
     executable: PathBuf,
-    self_hosted: bool,
+    arguments: Vec<String>,
+    endpoint_via_env: bool,
 }
 
 fn core_executable() -> Result<CoreCommand, UiError> {
     if let Some(path) = env::var_os("NVIDE_CORE_BIN") {
         return Ok(CoreCommand {
             executable: path.into(),
-            self_hosted: false,
+            arguments: Vec::new(),
+            endpoint_via_env: false,
         });
     }
     let current = env::current_exe().map_err(display_error)?;
@@ -769,18 +1017,24 @@ fn core_executable() -> Result<CoreCommand, UiError> {
     if core.is_file() {
         Ok(CoreCommand {
             executable: core,
-            self_hosted: false,
+            arguments: Vec::new(),
+            endpoint_via_env: false,
         })
     } else {
-        Ok(CoreCommand {
-            executable: current,
-            self_hosted: true,
-        })
+        Err(UiError(format!(
+            "nvide-core was not found beside {}",
+            current.display()
+        )))
     }
 }
 
 fn local_endpoint() -> Result<String, UiError> {
-    let name = format!("nvide-{}", std::process::id());
+    static NEXT_ENDPOINT: AtomicU64 = AtomicU64::new(1);
+    let name = format!(
+        "nvide-{}-{}",
+        std::process::id(),
+        NEXT_ENDPOINT.fetch_add(1, Ordering::Relaxed)
+    );
     if cfg!(windows) {
         Ok(name)
     } else {
@@ -799,6 +1053,66 @@ fn display_error(error: impl fmt::Display) -> UiError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fixture_command(test_name: &str, ignored: bool) -> Result<CoreCommand, UiError> {
+        let mut arguments = Vec::new();
+        if ignored {
+            arguments.push("--ignored".to_owned());
+        }
+        arguments.extend([
+            "--exact".to_owned(),
+            test_name.to_owned(),
+            "--nocapture".to_owned(),
+        ]);
+        Ok(CoreCommand {
+            executable: env::current_exe().map_err(display_error)?,
+            arguments,
+            endpoint_via_env: true,
+        })
+    }
+
+    #[test]
+    #[ignore]
+    fn phase0_supervisor_core_fixture() -> Result<(), Box<dyn Error>> {
+        let endpoint = env::var(nvide_platform::NRPC_ENDPOINT_ENV)?;
+        let stream = nvide_ipc::LocalStream::connect(&endpoint)?;
+        let mut version = 0_u64;
+        let mut text = String::new();
+        nvide_ipc::serve(stream, move |request| {
+            let core_received_ns =
+                nvide_ipc::platform_monotonic_ns().map_err(|error| schema::RpcError {
+                    code: schema::ErrorCode::Internal,
+                    message: error.to_string(),
+                })?;
+            if request.expected_version != version {
+                return Err(schema::RpcError {
+                    code: schema::ErrorCode::InvalidArgument,
+                    message: "stale fixture version".to_owned(),
+                });
+            }
+            version = version.saturating_add(1);
+            text.push_str(&request.text);
+            let version_increment_ns =
+                nvide_ipc::platform_monotonic_ns().map_err(|error| schema::RpcError {
+                    code: schema::ErrorCode::Internal,
+                    message: error.to_string(),
+                })?;
+            Ok(schema::ViewportSnapshot {
+                trace_id: request.trace_id,
+                version,
+                text: text.clone(),
+                core_received_ns,
+                version_increment_ns,
+                viewport_emit_ns: nvide_ipc::platform_monotonic_ns().map_err(|error| {
+                    schema::RpcError {
+                        code: schema::ErrorCode::Internal,
+                        message: error.to_string(),
+                    }
+                })?,
+            })
+        })?;
+        Ok(())
+    }
 
     #[test]
     fn restart_budget_exhausts_and_drops_old_crashes() -> Result<(), UiError> {
@@ -827,5 +1141,66 @@ mod tests {
             failed_core_health(5, Duration::from_secs(5), "missed".to_owned()),
             CoreHealth::RestartRequired("missed".to_owned())
         );
+    }
+
+    #[test]
+    fn idle_ui_schedules_heartbeat_wakeup() {
+        assert!(matches!(
+            idle_control_flow(false, Instant::now() + HEARTBEAT_INTERVAL),
+            ControlFlow::WaitUntil(_)
+        ));
+        assert_eq!(idle_control_flow(true, Instant::now()), ControlFlow::Poll);
+    }
+
+    #[test]
+    fn supervisor_restarts_rebinds_and_exhausts_real_budget() -> Result<(), Box<dyn Error>> {
+        let command = fixture_command("tests::phase0_supervisor_core_fixture", true)?;
+        let mut supervisor = CoreSupervisor::start(command)?;
+        assert_eq!(supervisor.heartbeat(1), CoreHealth::Healthy);
+
+        supervisor.child.kill()?;
+        supervisor.child.wait()?;
+        supervisor.last_healthy = Instant::now() - Duration::from_secs(5);
+        assert!(matches!(
+            supervisor.heartbeat(2),
+            CoreHealth::RestartRequired(_)
+        ));
+        supervisor.restart()?;
+        assert_eq!(supervisor.heartbeat(3), CoreHealth::Healthy);
+
+        let dispatch_ns = nvide_ipc::platform_monotonic_ns()?;
+        let viewport = supervisor.edit(&schema::EditRequest {
+            trace_id: 9,
+            expected_version: 0,
+            char_offset: 0,
+            text: "restart-ok".to_owned(),
+            dispatch_ns,
+        })?;
+        assert_eq!(
+            (viewport.version, viewport.text.as_str()),
+            (1, "restart-ok")
+        );
+
+        for _ in 0..2 {
+            supervisor.child.kill()?;
+            supervisor.child.wait()?;
+            supervisor.restart()?;
+        }
+        supervisor.child.kill()?;
+        supervisor.child.wait()?;
+        assert!(supervisor.restart().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn child_exit_before_connect_is_reported() -> Result<(), UiError> {
+        let command = fixture_command("tests::no_such_test", false)?;
+        let started = Instant::now();
+        let error = CoreSupervisor::start(command)
+            .err()
+            .ok_or_else(|| UiError("fixture unexpectedly connected".to_owned()))?;
+        assert!(error.to_string().contains("timed out"));
+        assert!(started.elapsed() < Duration::from_secs(7));
+        Ok(())
     }
 }

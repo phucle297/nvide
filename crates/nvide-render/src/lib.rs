@@ -7,7 +7,7 @@ use std::{
     error::Error,
     fmt,
     future::Future,
-    sync::Arc,
+    sync::{mpsc, Arc, Mutex},
     task::{Context, Poll, Wake, Waker},
     thread,
 };
@@ -45,6 +45,9 @@ pub enum RenderError {
     Timeout,
     OutOfMemory,
     DeviceLost(String),
+    Timestamp(String),
+    ReadbackUnsupported,
+    Readback(String),
 }
 
 impl fmt::Display for RenderError {
@@ -60,6 +63,13 @@ impl fmt::Display for RenderError {
             Self::Timeout => formatter.write_str("render surface timed out"),
             Self::OutOfMemory => formatter.write_str("GPU is out of memory"),
             Self::DeviceLost(message) => write!(formatter, "GPU device was lost: {message}"),
+            Self::Timestamp(message) => {
+                write!(formatter, "presentation timestamp failed: {message}")
+            }
+            Self::ReadbackUnsupported => {
+                formatter.write_str("the render surface does not support frame readback")
+            }
+            Self::Readback(message) => write!(formatter, "frame readback failed: {message}"),
         }
     }
 }
@@ -81,6 +91,22 @@ pub struct Renderer {
     shaping: ShapingBuffer,
     swash_cache: SwashCache,
     text: String,
+    glyph_count: usize,
+    frame_sequence: u64,
+    readback_supported: bool,
+    device_loss: Arc<Mutex<Option<String>>>,
+}
+
+pub struct PresentedFrame {
+    pub sequence: u64,
+    pub present_ns: u64,
+    pub readback: Option<FrameReadback>,
+}
+
+pub struct FrameReadback {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
 }
 
 impl Renderer {
@@ -130,8 +156,14 @@ impl Renderer {
         let alpha_mode = capabilities.alpha_modes.first().copied().ok_or_else(|| {
             RenderError::Initialization("surface exposes no alpha mode".to_owned())
         })?;
+        let readback_supported = capabilities.usages.contains(wgpu::TextureUsages::COPY_SRC);
         let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | if readback_supported {
+                    wgpu::TextureUsages::COPY_SRC
+                } else {
+                    wgpu::TextureUsages::empty()
+                },
             format,
             width: width.max(1),
             height: height.max(1),
@@ -141,6 +173,13 @@ impl Renderer {
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
+        let device_loss = Arc::new(Mutex::new(None));
+        let callback_state = Arc::clone(&device_loss);
+        device.set_device_lost_callback(move |reason, message| {
+            if let Ok(mut state) = callback_state.lock() {
+                *state = Some(format!("{reason:?}: {message}"));
+            }
+        });
 
         let atlas = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("nvide-glyph-atlas"),
@@ -260,6 +299,10 @@ impl Renderer {
             shaping,
             swash_cache: SwashCache::new(),
             text: String::new(),
+            glyph_count: 0,
+            frame_sequence: 0,
+            readback_supported,
+            device_loss,
         })
     }
 
@@ -326,10 +369,19 @@ impl Renderer {
                 usage: wgpu::BufferUsages::INDEX,
             });
         self.index_count = u32::try_from(indices.len() / 4).map_err(|_| RenderError::AtlasFull)?;
+        self.glyph_count = self.index_count as usize / 6;
         Ok(())
     }
 
-    pub fn render(&mut self) -> Result<(), RenderError> {
+    pub fn glyph_count(&self) -> usize {
+        self.glyph_count
+    }
+
+    pub fn render(&mut self, capture: bool) -> Result<PresentedFrame, RenderError> {
+        self.check_device()?;
+        if capture && !self.readback_supported {
+            return Err(RenderError::ReadbackUnsupported);
+        }
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
@@ -374,10 +426,116 @@ impl Renderer {
                 pass.draw_indexed(0..self.index_count, 0, 0..1);
             }
         }
+        let readback = if capture {
+            Some(self.encode_readback(&mut encoder, &frame.texture))
+        } else {
+            None
+        };
         self.queue.submit([encoder.finish()]);
         frame.present();
-        Ok(())
+        let present_ns = nvide_platform::monotonic_ns()
+            .map_err(|error| RenderError::Timestamp(error.to_string()))?;
+        self.frame_sequence = self.frame_sequence.saturating_add(1);
+        let readback = readback
+            .map(|pending| self.finish_readback(pending))
+            .transpose()?;
+        self.check_device()?;
+        Ok(PresentedFrame {
+            sequence: self.frame_sequence,
+            present_ns,
+            readback,
+        })
     }
+
+    fn check_device(&self) -> Result<(), RenderError> {
+        let state = self
+            .device_loss
+            .lock()
+            .map_err(|_| RenderError::DeviceLost("device-loss state is poisoned".to_owned()))?;
+        match state.as_ref() {
+            Some(message) => Err(RenderError::DeviceLost(message.clone())),
+            None => Ok(()),
+        }
+    }
+
+    fn encode_readback(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        texture: &wgpu::Texture,
+    ) -> PendingReadback {
+        let width = self.config.width;
+        let height = self.config.height.min(64);
+        let row_bytes = width * 4;
+        let padded_row_bytes = row_bytes.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
+            * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("nvide-frame-readback"),
+            size: u64::from(padded_row_bytes) * u64::from(height),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: &buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_row_bytes),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        PendingReadback {
+            buffer,
+            width,
+            height,
+            row_bytes,
+            padded_row_bytes,
+        }
+    }
+
+    fn finish_readback(&self, pending: PendingReadback) -> Result<FrameReadback, RenderError> {
+        let slice = pending.buffer.slice(..);
+        let (sender, receiver) = mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+        self.device.poll(wgpu::Maintain::Wait);
+        receiver
+            .recv()
+            .map_err(|error| RenderError::Readback(error.to_string()))?
+            .map_err(|error| RenderError::Readback(error.to_string()))?;
+        let mapped = slice.get_mapped_range();
+        let mut rgba = Vec::with_capacity((pending.row_bytes * pending.height) as usize);
+        for row in mapped.chunks_exact(pending.padded_row_bytes as usize) {
+            rgba.extend_from_slice(&row[..pending.row_bytes as usize]);
+        }
+        drop(mapped);
+        pending.buffer.unmap();
+        Ok(FrameReadback {
+            width: pending.width,
+            height: pending.height,
+            rgba,
+        })
+    }
+}
+
+struct PendingReadback {
+    buffer: wgpu::Buffer,
+    width: u32,
+    height: u32,
+    row_bytes: u32,
+    padded_row_bytes: u32,
 }
 
 fn empty_buffer(device: &wgpu::Device, label: &str, usage: wgpu::BufferUsages) -> wgpu::Buffer {
@@ -540,5 +698,13 @@ mod tests {
         assert_eq!(pixel_to_ndc_x(100.0, 100), 1.0);
         assert_eq!(pixel_to_ndc_y(0.0, 100), 1.0);
         assert_eq!(pixel_to_ndc_y(100.0, 100), -1.0);
+    }
+
+    #[test]
+    fn device_loss_is_a_typed_error() {
+        assert_eq!(
+            RenderError::DeviceLost("reset".to_owned()).to_string(),
+            "GPU device was lost: reset"
+        );
     }
 }

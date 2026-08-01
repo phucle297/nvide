@@ -10,8 +10,6 @@ default = []
 xtask = ["dep:nvide-rpc-schema", "nvide-rpc-schema/xtask"]
 
 [dependencies]
-nvide-buffer = { path = "../nvide-buffer" }
-nvide-ipc = { path = "../nvide-ipc" }
 nvide-rpc-schema = { path = "../nvide-rpc-schema", optional = true }
 nvide-ui = { path = "../nvide-ui" }
 

@@ -114,6 +114,7 @@ pub trait Buffer {
     fn line_count(&self) -> usize;
     fn version(&self) -> Version;
     fn text(&self) -> String;
+    fn slice(&self, range: Range<usize>) -> Result<String, BufferError>;
     fn line(&self, line: usize) -> Result<String, BufferError>;
     fn char_to_byte(&self, offset: usize) -> Result<usize, BufferError>;
     fn byte_to_char(&self, offset: usize) -> Result<usize, BufferError>;
@@ -267,6 +268,17 @@ impl Buffer for RopeBuffer {
 
     fn text(&self) -> String {
         self.rope.to_string()
+    }
+
+    fn slice(&self, range: Range<usize>) -> Result<String, BufferError> {
+        if range.start > range.end || range.end > self.len_chars() {
+            return Err(BufferError::InvalidRange {
+                start: range.start,
+                end: range.end,
+                len: self.len_chars(),
+            });
+        }
+        Ok(self.rope.slice(range).to_string())
     }
 
     fn line(&self, line: usize) -> Result<String, BufferError> {
@@ -470,6 +482,11 @@ mod tests {
         assert_eq!(buffer.line(2)?, "");
         assert_eq!(buffer.char_to_line(3)?, 1);
         assert_eq!(buffer.line_to_char(2)?, 5);
+        assert_eq!(buffer.slice(3..5)?, "β\n");
+        assert!(matches!(
+            buffer.slice(5..6),
+            Err(BufferError::InvalidRange { .. })
+        ));
         assert_eq!(buffer.char_to_byte(3)?, 3);
         assert_eq!(buffer.byte_to_char(3)?, 3);
         assert_eq!(
@@ -548,16 +565,48 @@ mod tests {
                 .wrapping_add(1);
             let len = (state as usize % 24) + 1;
             let original = (0..len)
-                .map(|index| if index % 5 == 0 { 'λ' } else { 'a' })
+                .map(|index| match index % 7 {
+                    0 => 'λ',
+                    3 => '\r',
+                    4 => '\n',
+                    _ => 'a',
+                })
                 .collect::<String>();
             let mut buffer = RopeBuffer::new(&original);
-            let at = state as usize % (buffer.len_chars() + 1);
-            let inserted = if state & 1 == 0 { "🦀" } else { "xy" };
-            let after = at + inserted.chars().count();
-            buffer.insert(at, inserted, cursor(at), cursor(after))?;
+            let at = state as usize % buffer.len_chars();
+            let inserted = if state & 1 == 0 { "🦀\r\n" } else { "λ\n" };
+            let outcome = buffer.apply_batch(EditBatch {
+                edits: vec![
+                    Edit::Delete { range: at..at + 1 },
+                    Edit::Insert {
+                        at,
+                        text: inserted.to_owned(),
+                    },
+                ],
+                before: cursor(at),
+                after: cursor(at + inserted.chars().count()),
+            })?;
+            assert_eq!(outcome.version, 1);
+            assert!(matches!(
+                buffer.byte_to_char(1),
+                Err(BufferError::ByteNotCharBoundary { .. })
+            ));
+            let accepted = (buffer.text(), buffer.version());
+            assert!(buffer
+                .apply_batch(EditBatch {
+                    edits: vec![Edit::Delete {
+                        range: 0..buffer.len_chars() + 1,
+                    }],
+                    before: cursor(0),
+                    after: cursor(0),
+                })
+                .is_err());
+            assert_eq!(accepted, (buffer.text(), buffer.version()));
             buffer.undo()?;
             assert_eq!(buffer.text(), original);
-            buffer.redo(None)?;
+            assert_eq!(buffer.version(), 2);
+            buffer.redo(Some(outcome.node))?;
+            assert_eq!(buffer.version(), 3);
             assert_ne!(buffer.text(), original);
         }
         Ok(())
