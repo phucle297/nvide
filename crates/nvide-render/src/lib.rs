@@ -78,6 +78,7 @@ impl fmt::Display for RenderError {
 impl Error for RenderError {}
 
 pub struct Renderer {
+    adapter_info: wgpu::AdapterInfo,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -135,6 +136,7 @@ impl Renderer {
             })
             .await
             .ok_or_else(|| RenderError::Initialization("no compatible GPU adapter".to_owned()))?;
+        let adapter_info = adapter.get_info();
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -287,6 +289,7 @@ impl Renderer {
         let mut font_system = FontSystem::new();
         let shaping = ShapingBuffer::new(&mut font_system, Metrics::new(24.0, 32.0));
         Ok(Self {
+            adapter_info,
             surface,
             device,
             queue,
@@ -307,6 +310,10 @@ impl Renderer {
             readback_supported,
             device_loss,
         })
+    }
+
+    pub fn benchmark_adapter_manifest(&self) -> String {
+        adapter_manifest(&self.adapter_info)
     }
 
     pub fn resize(&mut self, width: u32, height: u32) -> Result<(), RenderError> {
@@ -581,6 +588,20 @@ impl Renderer {
     }
 }
 
+fn adapter_manifest(info: &wgpu::AdapterInfo) -> String {
+    let one_line = |value: &str| value.replace(['\r', '\n'], " ");
+    format!(
+        "format=nvide-phase0-renderer-v1\nwgpu_backend={:?}\nadapter_name={}\nadapter_vendor=0x{:04X}\nadapter_device=0x{:04X}\nadapter_type={:?}\nadapter_driver={}\nadapter_driver_info={}\n",
+        info.backend,
+        one_line(&info.name),
+        info.vendor,
+        info.device,
+        info.device_type,
+        one_line(&info.driver),
+        one_line(&info.driver_info)
+    )
+}
+
 fn readback_deadline_error() -> RenderError {
     RenderError::Readback("mapping exceeded the trace deadline".to_owned())
 }
@@ -761,5 +782,21 @@ mod tests {
             RenderError::DeviceLost("reset".to_owned()).to_string(),
             "GPU device was lost: reset"
         );
+    }
+
+    #[test]
+    fn adapter_manifest_is_single_line_per_field() {
+        let manifest = adapter_manifest(&wgpu::AdapterInfo {
+            name: "AMD\n860M".to_owned(),
+            vendor: 0x1002,
+            device: 0x150E,
+            device_type: wgpu::DeviceType::IntegratedGpu,
+            driver: "AMD\rdriver".to_owned(),
+            driver_info: "32.0".to_owned(),
+            backend: wgpu::Backend::Vulkan,
+        });
+        assert!(manifest.contains("wgpu_backend=Vulkan\nadapter_name=AMD 860M\n"));
+        assert!(manifest.contains("adapter_vendor=0x1002\nadapter_device=0x150E\n"));
+        assert!(manifest.contains("adapter_driver=AMD driver\n"));
     }
 }

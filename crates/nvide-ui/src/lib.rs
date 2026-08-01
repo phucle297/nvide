@@ -138,6 +138,11 @@ impl ApplicationHandler for App {
             if let Err(error) = benchmark.start() {
                 return self.fail(event_loop, error);
             }
+            if let Err(error) =
+                benchmark.write_renderer_manifest(&renderer.benchmark_adapter_manifest())
+            {
+                return self.fail(event_loop, error);
+            }
         }
         self.renderer = Some(renderer);
         self.window = Some(window.clone());
@@ -601,6 +606,13 @@ impl Benchmark {
             }
         }
         Ok(())
+    }
+
+    fn write_renderer_manifest(&self, contents: &str) -> Result<(), UiError> {
+        let output = match self {
+            Self::Clear { output, .. } | Self::Edit { output, .. } => output,
+        };
+        fs::write(output.join("renderer.txt"), contents).map_err(display_error)
     }
 
     fn pending_deadline(&self) -> Option<Instant> {
