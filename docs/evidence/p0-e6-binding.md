@@ -21,8 +21,8 @@ This record binds only the reference host, presentation authority, exact command
 | GPU / OS driver | AMD Radeon 860M Graphics / `32.0.22024.3004` |
 | NVide-selected wgpu adapter | Vulkan; AMD Radeon 860M; vendor `0x1002`; device `0x1114`; integrated GPU; AMD proprietary driver `25.20.24.03 (LLPC)` |
 | Physical display | Lenovo internal panel `LEN8BAD`; 2880×1800; Windows scale 175% (`AppliedDPI=168`) |
-| Eligible mode | 120 Hz configured; authority-observed 120.127335 Hz |
-| Comparison mode | 60 Hz configured; authority-observed 60.007981 Hz |
+| Eligible mode | 120 Hz configured; authority-observed 120.162700 Hz |
+| Comparison mode | 60 Hz configured; authority-observed 59.986203 Hz |
 | Power | Windows Balanced scheme `381b4222-f694-41f0-9685-ff5bb260df2e` |
 | Toolchain | `rustc 1.97.1 (8bab26f4f 2026-07-14)`, `cargo 1.97.1 (c980f4866 2026-06-30)`, host `x86_64-pc-windows-msvc` |
 
