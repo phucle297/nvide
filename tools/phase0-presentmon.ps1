@@ -347,7 +347,7 @@ $appArguments = if ($Kind -eq "clear") {
     @("--phase0-benchmark", "edit", "--run-id", $RunId, "--output", $Output, "--warmup-edits", $WarmupEdits, "--measure-edits", $MeasureEdits)
 }
 if ($UnboundDiagnostic) { $appArguments += "--unbound-diagnostic" }
-$captureSeconds = if ($Kind -eq "clear") { $WarmupSeconds + $MeasureSeconds + 10 } else { [Math]::Max(15, ($WarmupEdits + $MeasureEdits) * 2) }
+$captureSeconds = if ($Kind -eq "clear") { $WarmupSeconds + $MeasureSeconds + 10 } else { [Math]::Max(15, ($WarmupEdits + $MeasureEdits) * 5 + 10) }
 $presentMonArguments = @("--process_id", "PID", "--output_stdout", "--no_console_stats", "--qpc_time", "--v1_metrics", "--timed", $captureSeconds, "--terminate_after_timed", "--session_name", $session)
 
 $commandLine = New-Object Text.StringBuilder
